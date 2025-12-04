@@ -1,47 +1,44 @@
 import 'dart:ffi' as ffi;
 import 'dart:io';
+import 'package:ffi/ffi.dart'; // Helper for allocating memory
 
-// 1. Define the C function signature
-// Returns Float, takes Pointer<Float>, Int, Int
-typedef NativeDetectPitch =
-    ffi.Float Function(
-      ffi.Pointer<ffi.Float> audioData,
-      ffi.Int32 length,
-      ffi.Int32 sampleRate,
-    );
-
-// 2. Define the Dart function signature
-typedef DartDetectPitch =
-    double Function(
-      ffi.Pointer<ffi.Float> audioData,
-      int length,
-      int sampleRate,
-    );
+typedef NativeDetectPitch = ffi.Float Function(ffi.Pointer<ffi.Float>, ffi.Int32, ffi.Int32);
+typedef DartDetectPitch = double Function(ffi.Pointer<ffi.Float>, int, int);
 
 class AudioEngine {
   late ffi.DynamicLibrary _lib;
   late DartDetectPitch _detectPitch;
 
   AudioEngine() {
-    // 3. Load the library
-    // On Android, the file is named "lib" + [project_name] + ".so"
     if (Platform.isAndroid) {
       _lib = ffi.DynamicLibrary.open("libnative_tuner.so");
     } else {
-      // Setup for iOS/Mac/Windows later
       _lib = ffi.DynamicLibrary.process();
     }
 
-    // 4. Look up the function
     _detectPitch = _lib
         .lookup<ffi.NativeFunction<NativeDetectPitch>>('detect_pitch')
         .asFunction();
   }
 
-  // Wrapper to make it easy to call
-  double getPitch(double dummyData) {
-    // In the real app, you will pass a pointer to your audio buffer here.
-    // For this test, we pass a null pointer just to see if the function runs.
-    return _detectPitch(ffi.nullptr, 1024, 44100);
+  double processAudio(List<double> audioData) {
+    if (audioData.isEmpty) return -1.0;
+
+    // 1. Allocate C memory
+    final pointer = calloc<ffi.Float>(audioData.length);
+
+    // 2. Copy Dart data to C memory
+    // (This loop is the bottleneck, we can optimize later with Float32List)
+    for (var i = 0; i < audioData.length; i++) {
+      pointer[i] = audioData[i];
+    }
+
+    // 3. Call C++
+    final result = _detectPitch(pointer, audioData.length, 44100);
+
+    // 4. Free memory
+    calloc.free(pointer);
+
+    return result;
   }
 }
