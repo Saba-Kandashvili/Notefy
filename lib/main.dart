@@ -2,12 +2,20 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_audio_capture/flutter_audio_capture.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'audio_engine.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Lock orientation to portrait only
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   runApp(const MyApp());
 }
 
@@ -185,6 +193,9 @@ class _TunerScreenState extends State<TunerScreen>
 
   // Continuous scrolling animation for seismograph effect
   late AnimationController _scrollAnimationController;
+  double _scrollOffset =
+      0.0; // Continuous scroll offset (never resets, just wraps)
+  static const double _scrollSpeed = 0.8; // Pixels per frame to scroll up
 
   // Smooth position tracking - continuously lerps toward target
   double _displayedCents =
@@ -212,13 +223,15 @@ class _TunerScreenState extends State<TunerScreen>
     });
 
     // Initialize continuous scroll animation (creates the moving seismograph effect)
-    // This also drives the smooth position lerping
+    // This drives smooth updates at 60fps for fluid animation
     _scrollAnimationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 16), // ~60fps tick
     )..repeat();
     _scrollAnimationController.addListener(() {
       if (mounted) {
+        // Increment scroll offset continuously
+        _scrollOffset += _scrollSpeed;
         _updateDisplayedCents();
         _addTrailPoint();
         setState(() {});
@@ -337,6 +350,8 @@ class _TunerScreenState extends State<TunerScreen>
         // while still maintaining responsive real-time updates
         bufferSize: 8192,
       );
+      // Keep screen on while recording
+      WakelockPlus.enable();
       setState(() {
         _isRecording = true;
         _status = "Listening...";
@@ -361,6 +376,8 @@ class _TunerScreenState extends State<TunerScreen>
     } catch (e) {
       // Ignore stop errors
     }
+    // Allow screen to turn off again
+    WakelockPlus.disable();
     _standbyTimer?.cancel();
     _resetStandby();
     setState(() {
@@ -1026,7 +1043,7 @@ class _TunerScreenState extends State<TunerScreen>
             currentOctave: _octave,
             isInStandby: _isInStandby,
             standbyProgress: _standbyAnimation.value,
-            scrollProgress: _scrollAnimationController.value,
+            scrollOffset: _scrollOffset,
           ),
           size: Size.infinite,
         ),
@@ -1269,7 +1286,7 @@ class SeismographPainter extends CustomPainter {
   final int currentOctave;
   final bool isInStandby;
   final double standbyProgress;
-  final double scrollProgress; // 0.0 to 1.0, continuously cycling
+  final double scrollOffset; // Continuous scroll offset in pixels
 
   SeismographPainter({
     required this.trailPositions,
@@ -1280,7 +1297,7 @@ class SeismographPainter extends CustomPainter {
     required this.currentOctave,
     this.isInStandby = false,
     this.standbyProgress = 0.0,
-    this.scrollProgress = 0.0,
+    this.scrollOffset = 0.0,
   });
 
   @override
@@ -1303,12 +1320,12 @@ class SeismographPainter extends CustomPainter {
 
     const int numLines = 8; // More lines for smoother scrolling effect
     final lineSpacing = size.height / numLines;
-    final scrollOffset =
-        scrollProgress * lineSpacing; // Scroll by one line spacing per cycle
+    // Use modulo to wrap scroll offset smoothly
+    final lineScrollOffset = scrollOffset % lineSpacing;
 
     for (int i = -1; i <= numLines; i++) {
       // Start from -1 to have lines entering from bottom
-      double y = (i * lineSpacing) - scrollOffset;
+      double y = (i * lineSpacing) - lineScrollOffset;
       // Wrap around when line goes off the top
       if (y < 0) y += size.height + lineSpacing;
       if (y > size.height) continue;
@@ -1382,77 +1399,11 @@ class SeismographPainter extends CustomPainter {
     // Always draw the bubble when active (even in standby)
     if (!isActive) return;
 
-    // Draw the trail that scrolls upward (seismograph effect)
-    if (trailPositions.isNotEmpty) {
-      final trailLength = trailPositions.length;
-      final bubbleY = size.height - 60;
-      final trailStartY = bubbleY - 10; // Start trail slightly above bubble
-      final trailHeight = size.height - 100; // Available height for trail
-
-      // Calculate scroll offset for trail (makes it appear to move upward)
-      final trailScrollOffset =
-          scrollProgress * (trailHeight / trailLength) * 3;
-
-      // Opacity fade based on standby
-      final trailOpacity = isInStandby ? 0.3 * (1 - standbyProgress) : 0.3;
-
-      if (trailOpacity > 0.01) {
-        final tracePaint = Paint()
-          ..strokeWidth = 2
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round;
-
-        final path = Path();
-        bool pathStarted = false;
-
-        for (int i = 0; i < trailLength; i++) {
-          final cents = trailPositions[i];
-          // Map cents (-100 to +100) to x position
-          final x = centerX + (cents / 100) * (size.width / 2 - 40);
-
-          // Y position: newer points at bottom (index 0), older scroll upward
-          // Points move up over time with the scroll animation
-          final baseY = trailStartY - (i / trailLength) * trailHeight;
-          final y = baseY - trailScrollOffset;
-
-          // Skip points that have scrolled off the top
-          if (y < 30) continue;
-
-          // Fade out points as they get older (further from bubble)
-          final age = i / trailLength;
-          final pointOpacity = trailOpacity * (1.0 - age * 0.7);
-
-          if (!pathStarted) {
-            path.moveTo(x, y);
-            pathStarted = true;
-          } else {
-            path.lineTo(x, y);
-          }
-
-          // Draw trail segments with varying opacity
-          if (i > 0 && i % 3 == 0) {
-            tracePaint.color = Colors.white.withOpacity(pointOpacity);
-            canvas.drawPath(path, tracePaint);
-            path.reset();
-            path.moveTo(x, y);
-          }
-        }
-
-        // Draw remaining path
-        if (pathStarted) {
-          tracePaint.color = Colors.white.withOpacity(trailOpacity);
-          canvas.drawPath(path, tracePaint);
-        }
-      }
-    }
-
-    // Draw the current position circle (floating note bubble)
-    final currentY = size.height - 60;
-
-    // Use animated cents value for smooth movement
+    // Calculate bubble position first (we need it for the trail)
+    final bubbleY = size.height - 60;
     final currentX = centerX + (currentCents / 100) * (size.width / 2 - 40);
 
-    // Determine color based on state
+    // Determine bubble color based on state
     Color bubbleColor;
     if (isInStandby) {
       // Fade to a neutral cyan/blue color during standby
@@ -1466,6 +1417,47 @@ class SeismographPainter extends CustomPainter {
     } else {
       bubbleColor = const Color(0xFF64B5F6); // Default light blue
     }
+
+    // Draw the trail that scrolls upward (seismograph effect)
+    // Trail ALWAYS draws and starts exactly at the bubble
+    if (trailPositions.isNotEmpty) {
+      final trailLength = trailPositions.length;
+      final trailHeight = size.height - 120; // Available height for trail
+
+      final tracePaint = Paint()
+        ..strokeWidth =
+            3.5 // Thicker trail
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+
+      // Draw trail from bubble upward - segment by segment for gradient effect
+      for (int i = 0; i < trailLength - 1; i++) {
+        final cents1 = trailPositions[i];
+        final cents2 = trailPositions[i + 1];
+
+        // Map cents to x positions
+        final x1 = centerX + (cents1 / 100) * (size.width / 2 - 40);
+        final x2 = centerX + (cents2 / 100) * (size.width / 2 - 40);
+
+        // Y positions: index 0 is at bubble, higher indices go upward
+        final y1 = bubbleY - (i / trailLength) * trailHeight;
+        final y2 = bubbleY - ((i + 1) / trailLength) * trailHeight;
+
+        // Skip if off screen
+        if (y2 < 30) continue;
+
+        // Fade out as trail goes up (older = more transparent)
+        final age = i / trailLength;
+        final segmentOpacity = (1.0 - age * 0.85).clamp(0.1, 1.0);
+
+        // Use bubble color with fading opacity
+        tracePaint.color = bubbleColor.withOpacity(segmentOpacity * 0.8);
+        canvas.drawLine(Offset(x1, y1), Offset(x2, y2), tracePaint);
+      }
+    }
+
+    // Draw the current position circle (floating note bubble)
+    final currentY = bubbleY;
 
     // Glow effect (reduce during standby for subtle look)
     final glowOpacity = isInStandby ? 0.3 * (1 - standbyProgress * 0.5) : 0.3;
