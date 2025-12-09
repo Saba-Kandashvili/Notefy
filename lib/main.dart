@@ -435,7 +435,8 @@ class _TunerScreenState extends State<TunerScreen>
       _isInStandby = true;
     });
 
-    // The continuous lerp in _updateDisplayedCents will handle smooth return to center
+    // Start the standby animation for smooth transition
+    _standbyAnimationController.forward();
   }
 
   void _calculateNote(double freq) {
@@ -534,6 +535,20 @@ class _TunerScreenState extends State<TunerScreen>
       _selectedPianoKey = null;
       _trailPositions.clear();
     });
+
+    // Update the native engine's tuning mode for optimized frequency filtering
+    switch (mode) {
+      case TuningMode.guitar:
+        _engine.setTuningMode(TuningModeNative.guitar);
+        break;
+      case TuningMode.piano:
+        _engine.setTuningMode(TuningModeNative.piano);
+        break;
+      case TuningMode.chromatic:
+        _engine.setTuningMode(TuningModeNative.chromatic);
+        break;
+    }
+
     Navigator.pop(context);
   }
 
@@ -696,7 +711,8 @@ class _TunerScreenState extends State<TunerScreen>
 
   Widget _buildChromaticTunerBody() {
     // In chromatic mode, just show detected note (no "target")
-    String detectedNote = _isRecording && _note != "--"
+    // Hide the note when in standby mode
+    String detectedNote = _isRecording && _note != "--" && !_isInStandby
         ? "$_note$_octave"
         : "--";
 
@@ -709,12 +725,12 @@ class _TunerScreenState extends State<TunerScreen>
           style: TextStyle(
             fontSize: 72,
             fontWeight: FontWeight.bold,
-            color: _isRecording && _note != "--"
+            color: _isRecording && _note != "--" && !_isInStandby
                 ? _getTuningColor()
                 : Colors.white38,
           ),
         ),
-        if (_isRecording && _currentPitch > 0)
+        if (_isRecording && _currentPitch > 0 && !_isInStandby)
           Text(
             "${_currentPitch.toStringAsFixed(1)} Hz",
             style: const TextStyle(color: Colors.white38, fontSize: 14),
@@ -1070,11 +1086,13 @@ class _TunerScreenState extends State<TunerScreen>
           Column(
             children: [
               Text(
-                _isRecording && _note != "--" ? centsText : "--",
+                _isRecording && _note != "--" && !_isInStandby
+                    ? centsText
+                    : "--",
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: _isRecording && _note != "--"
+                  color: _isRecording && _note != "--" && !_isInStandby
                       ? _getTuningColor()
                       : Colors.white38,
                 ),
@@ -1089,11 +1107,11 @@ class _TunerScreenState extends State<TunerScreen>
           Column(
             children: [
               Text(
-                status.isEmpty ? "--" : status,
+                status.isEmpty || _isInStandby ? "--" : status,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
-                  color: _isRecording && _note != "--"
+                  color: _isRecording && _note != "--" && !_isInStandby
                       ? _getTuningColor()
                       : Colors.white38,
                 ),
@@ -1480,10 +1498,9 @@ class SeismographPainter extends CustomPainter {
     canvas.drawCircle(Offset(currentX, currentY), 25, borderPaint);
 
     // Content inside bubble - show note or music symbol
-    if (isInStandby && standbyProgress > 0.5) {
-      // Show music note symbol (♪) when in standby
-      final symbolOpacity =
-          (standbyProgress - 0.5) * 2; // Fade in from 0.5 to 1.0
+    if (isInStandby) {
+      // Show music note symbol (♪) when in standby - fade in as standby progresses
+      final symbolOpacity = standbyProgress.clamp(0.0, 1.0);
       final notePainter = TextPainter(
         text: TextSpan(
           text: "♪",
@@ -1506,7 +1523,7 @@ class SeismographPainter extends CustomPainter {
 
       // Fade out the note text during transition
       if (standbyProgress < 1.0 && currentNote != "--") {
-        final noteOpacity = 1.0 - symbolOpacity;
+        final noteOpacity = (1.0 - standbyProgress).clamp(0.0, 1.0);
         final noteTextPainter = TextPainter(
           text: TextSpan(
             text: "$currentNote$currentOctave",

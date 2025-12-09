@@ -28,6 +28,39 @@ typedef DartDetectPitchWithConfidence =
 typedef NativeCleanup = ffi.Void Function();
 typedef DartCleanup = void Function();
 
+// Set tuning mode function
+typedef NativeSetTuningMode = ffi.Void Function(ffi.Int32);
+typedef DartSetTuningMode = void Function(int);
+
+// Set noise threshold function
+typedef NativeSetNoiseThreshold = ffi.Void Function(ffi.Float);
+typedef DartSetNoiseThreshold = void Function(double);
+
+// Set frequency range function
+typedef NativeSetFrequencyRange = ffi.Void Function(ffi.Float, ffi.Float);
+typedef DartSetFrequencyRange = void Function(double, double);
+
+// Reset frequency range function
+typedef NativeResetFrequencyRange = ffi.Void Function();
+typedef DartResetFrequencyRange = void Function();
+
+// Check if gate is open
+typedef NativeIsGateOpen = ffi.Bool Function();
+typedef DartIsGateOpen = bool Function();
+
+// ============================================================================
+// Tuning Mode Constants (must match C++ definitions)
+// ============================================================================
+
+enum TuningModeNative {
+  chromatic(0),
+  guitar(1),
+  piano(2);
+
+  final int value;
+  const TuningModeNative(this.value);
+}
+
 // ============================================================================
 // Pitch Detection Result
 // ============================================================================
@@ -54,6 +87,11 @@ class AudioEngine {
   late DartDetectPitch _detectPitch;
   late DartDetectPitchWithConfidence _detectPitchWithConfidence;
   DartCleanup? _cleanup;
+  DartSetTuningMode? _setTuningMode;
+  DartSetNoiseThreshold? _setNoiseThreshold;
+  DartSetFrequencyRange? _setFrequencyRange;
+  DartResetFrequencyRange? _resetFrequencyRange;
+  DartIsGateOpen? _isGateOpen;
 
   // Reusable buffer for audio data (avoids allocation every frame)
   ffi.Pointer<ffi.Float>? _audioBuffer;
@@ -96,7 +134,7 @@ class AudioEngine {
         )
         .asFunction();
 
-    // Try to load cleanup function (optional)
+    // Try to load optional functions
     try {
       _cleanup = _lib
           .lookup<ffi.NativeFunction<NativeCleanup>>('cleanup_pitch_detector')
@@ -105,9 +143,82 @@ class AudioEngine {
       _cleanup = null;
     }
 
+    try {
+      _setTuningMode = _lib
+          .lookup<ffi.NativeFunction<NativeSetTuningMode>>('set_tuning_mode')
+          .asFunction();
+    } catch (e) {
+      _setTuningMode = null;
+    }
+
+    try {
+      _setNoiseThreshold = _lib
+          .lookup<ffi.NativeFunction<NativeSetNoiseThreshold>>(
+            'set_noise_threshold',
+          )
+          .asFunction();
+    } catch (e) {
+      _setNoiseThreshold = null;
+    }
+
+    try {
+      _setFrequencyRange = _lib
+          .lookup<ffi.NativeFunction<NativeSetFrequencyRange>>(
+            'set_frequency_range',
+          )
+          .asFunction();
+    } catch (e) {
+      _setFrequencyRange = null;
+    }
+
+    try {
+      _resetFrequencyRange = _lib
+          .lookup<ffi.NativeFunction<NativeResetFrequencyRange>>(
+            'reset_frequency_range',
+          )
+          .asFunction();
+    } catch (e) {
+      _resetFrequencyRange = null;
+    }
+
+    try {
+      _isGateOpen = _lib
+          .lookup<ffi.NativeFunction<NativeIsGateOpen>>('is_gate_open')
+          .asFunction();
+    } catch (e) {
+      _isGateOpen = null;
+    }
+
     // Pre-allocate confidence pointer
     _confidencePtr = calloc<ffi.Float>(1);
   }
+
+  /// Set the tuning mode (chromatic, guitar, or piano)
+  /// This only affects noise gate sensitivity - frequency range is wide by default
+  void setTuningMode(TuningModeNative mode) {
+    _setTuningMode?.call(mode.value);
+  }
+
+  /// Set custom frequency range for detection
+  /// Use this for custom tunings (7-string, drop tuning, bass, etc.)
+  /// Example: setFrequencyRange(50.0, 1500.0) for a 7-string with drop tuning
+  void setFrequencyRange(double minFreq, double maxFreq) {
+    _setFrequencyRange?.call(minFreq, maxFreq);
+  }
+
+  /// Reset frequency range to defaults (25Hz - 4500Hz)
+  void resetFrequencyRange() {
+    _resetFrequencyRange?.call();
+  }
+
+  /// Set custom noise gate threshold (0.0 to 1.0)
+  /// Higher values = stricter noise gate (less background noise detected)
+  void setNoiseThreshold(double threshold) {
+    _setNoiseThreshold?.call(threshold);
+  }
+
+  /// Check if the noise gate is currently open (signal detected)
+  bool get isGateOpen => _isGateOpen?.call() ?? false;
 
   /// Process audio data and return detected pitch frequency.
   /// Returns -1.0 if no pitch is detected.
