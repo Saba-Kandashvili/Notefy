@@ -109,10 +109,10 @@ packages:
     dependency: "direct main"
     description:
       name: ffi
-      sha256: "289279317b4b16eb2bb7e271abccd4bf84ec9bdcbe999e278a94b804f5630418"
+      sha256: d07d37192dbf97461359c1518788f203b0c9102cfd2c35a716b823741219542c
       url: "https://pub.dev"
     source: hosted
-    version: "2.1.4"
+    version: "2.1.5"
   file:
     dependency: transitive
     description:
@@ -130,10 +130,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_audio_capture
-      sha256: "873fc96bd2e0033d0f14a41a79f7ed44ee52a32b319eab01a4192d8bb272431a"
+      sha256: d0ef8b0fdbd4795d2b07e05772a3733b8b8abf115badd8a7f8beaa6f55d24cb7
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.11"
+    version: "1.1.12"
   flutter_launcher_icons:
     dependency: "direct main"
     description:

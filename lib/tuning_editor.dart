@@ -16,14 +16,14 @@ class _TuningEditorState extends State<TuningEditor> {
   @override
   void initState() {
     super.initState();
-    // Create a deep copy so we don't mutate the main app state until save
+    // Create a deep copy so we do not mutate the main app state until save
     _editingPreset = widget.initialPreset.copy();
   }
 
   void _addString() {
     setState(() {
       var lowest = _editingPreset.strings.first;
-      // FIXED: Updated function name to match tuning_model.dart
+      // Use NoteUtils.calculateNextLowerString to insert the next lower string
       _editingPreset.strings.insert(
         0,
         NoteUtils.calculateNextLowerString(lowest),

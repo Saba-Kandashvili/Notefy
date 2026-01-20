@@ -26,7 +26,7 @@ class NoteUtils {
   }
 
   // Calculate the next string down by a Perfect 4th (5 semitones)
-  // FIXED: Renamed from 'nextLowerString' to match your Manager
+  // Renamed from 'nextLowerString' for clarity
   static InstrumentString calculateNextLowerString(InstrumentString current) {
     int idx = NOTE_NAMES.indexOf(current.note);
     int newIdx = idx - 5;
@@ -73,7 +73,7 @@ class TuningPreset {
 
   // --- FACTORY PRESETS ---
 
-  // FIXED: Renamed from 'standard6' to 'standard6String'
+  // Named 'standard6String' for clarity
   static TuningPreset standard6String() => TuningPreset(
     id: "std_6",
     name: "Standard 6-String",
@@ -88,7 +88,7 @@ class TuningPreset {
     ],
   );
 
-  // FIXED: Renamed to match style
+  // Renamed to match naming style
   static TuningPreset standard7String() => TuningPreset(
     id: "std_7",
     name: "7-String Standard (B)",

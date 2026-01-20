@@ -142,7 +142,7 @@ class SeismographPainter extends CustomPainter {
     }
 
     // Draw the trail that scrolls upward (seismograph effect)
-    // Trail ALWAYS draws and starts exactly at the bubble
+    // Trail is always drawn and starts at the bubble
     if (trailPositions.isNotEmpty) {
       final trailLength = trailPositions.length;
       final trailHeight = size.height - 120; // Available height for trail
@@ -308,6 +308,6 @@ class SeismographPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(SeismographPainter oldDelegate) {
-    return true; // Always repaint for smooth animation
+    return true; // Repaint for smooth animation
   }
 }

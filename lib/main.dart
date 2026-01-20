@@ -10,7 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-// Import your modular files
+// Local module imports
 import 'audio_engine.dart';
 import 'dynamic_headstock.dart';
 import 'tuning_editor.dart';
@@ -467,7 +467,41 @@ class _TunerScreenState extends State<TunerScreen>
 
   // --- PRESET MANAGEMENT ---
 
-  void _setTuningMode(TuningMode mode) {
+  Future<void> _setTuningMode(TuningMode mode) async {
+    // If the user is switching to the Piano tuner, show a friendly warning dialog
+    if (mode == TuningMode.piano) {
+      final bool? acknowledged = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text("Heads up — Piano tuner (Experimental)"),
+            content: const Text(
+              "The piano tuner is currently under development and may produce inaccurate results. "
+              "If you proceed, please double-check your tuning by ear or with a trusted reference. "
+              "Press 'Acknowledge' to continue, or 'Cancel' to return to your previous tuner.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text("Acknowledge"),
+              ),
+            ],
+          );
+        },
+      );
+
+      // If the user didn't acknowledge, close the drawer and abort switching
+      if (acknowledged != true) {
+        Navigator.pop(context);
+        return;
+      }
+    }
+
     setState(() {
       _tuningMode = mode;
       _targetString = null;
@@ -703,11 +737,7 @@ class _TunerScreenState extends State<TunerScreen>
         children: [
           DrawerHeader(
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              gradient: LinearGradient(colors: [Color(0xFF1A1A2E), Color(0xFF16213E)], begin: Alignment.topLeft, end: Alignment.bottomRight),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -715,50 +745,37 @@ class _TunerScreenState extends State<TunerScreen>
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.greenAccent.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.music_note,
-                    color: Colors.greenAccent,
-                    size: 32,
-                  ),
+                  decoration: BoxDecoration(color: Colors.greenAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.music_note, color: Colors.greenAccent, size: 32),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  "Notefy",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Text(
-                  "Native C++ Audio Engine",
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                const Text("Notefy", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                // --- BETA LABEL HERE ---
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.amber.withOpacity(0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.amber.withOpacity(0.5))),
+                  child: const Text("v1.0.0 (Public Beta)", style: TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
           ),
-          _buildDrawerItem(
-            Icons.graphic_eq,
-            "Chromatic",
-            "Detect any note",
-            TuningMode.chromatic,
-          ),
-          _buildDrawerItem(
-            Icons.music_note,
-            "Guitar / Strings",
-            "Custom tunings & Strings",
-            TuningMode.guitar,
-          ),
-          _buildDrawerItem(
-            Icons.piano,
-            "Piano",
-            "Full range (A0-C8)",
-            TuningMode.piano,
-          ),
+          _buildDrawerItem(Icons.graphic_eq, "Chromatic", "Detect any note", TuningMode.chromatic),
+          _buildDrawerItem(Icons.music_note, "Guitar / Strings", "Custom tunings & Strings", TuningMode.guitar),
+          _buildDrawerItem(Icons.piano, "Piano", "Full range (A0-C8)", TuningMode.piano),
+          
+          const Divider(color: Colors.white24),
+          
+          // --- FEEDBACK LINK ---
+          ListTile(
+            leading: const Icon(Icons.bug_report, color: Colors.white54),
+            title: const Text("Report a Bug", style: TextStyle(color: Colors.white70)),
+            onTap: () {
+                // You can add url_launcher here later to open GitHub Issues or Email
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please email bugs to sabakandashvili2004@gmail.com")));
+            },
+          )
         ],
       ),
     );
