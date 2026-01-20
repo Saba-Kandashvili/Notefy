@@ -1,4 +1,4 @@
-package com.example.notefy
+package com.aughma.notefy
 
 import io.flutter.embedding.android.FlutterActivity
 
