@@ -1,113 +1,85 @@
-# Project Name: PreciseTuner (Native C++ Engine)
+# Notefy
 
-## 1. Executive Summary
+![License](https://img.shields.io/badge/License-CC_BY_NC_SA_4.0-lightgrey.svg)
+![Platform](https://img.shields.io/badge/Platform-Android-green.svg)
 
-We are building a professional-grade, chromatic instrument tuner for Android (and eventually iOS). The primary goal is to achieve **high-precision pitch detection** capable of tuning instruments ranging from guitars to pianos (low bass frequencies) with zero latency.
+Notefy is a high-precision, chromatic instrument tuner application for Android. It utilizes a hybrid architecture, combining a Flutter-based user interface with a native C++ audio engine to achieve low-latency pitch detection.
 
-Unlike existing market solutions, this app will be:
+Unlike standard tuner applications that rely on FFT (Fast Fourier Transform) within the managed runtime, Notefy implements the **YIN Algorithm** in unmanaged C++ to solve specific physics challenges associated with tuning instruments, such as inharmonicity and low-frequency detection on mobile hardware.
 
-- **Ad-free and lightweight:** No Unity overhead, no bloatware.
-- **Mathematically precise:** Using industry-standard DSP (Digital Signal Processing) algorithms.
-- **High Performance:** Bypassing the Java/Dart Virtual Machine for audio processing.
+## Features
 
-## 2. Technical Architecture
+- **Hybrid Audio Engine:** Audio processing is offloaded to a compiled C++ shared library via Dart FFI (Foreign Function Interface), bypassing the Dart/Java VM garbage collector for real-time performance.
+- **YIN Algorithm:** Implements autocorrelation, difference function, and parabolic interpolation to calculate the fundamental frequency with high precision.
+- **Customizable Tuning:**
+  - Dynamic headstock generation supporting arbitrary string counts (6, 7, 8, 12, etc.).
+  - Supports single-side (Ibanez/Fender style) and dual-side (Gibson style) layouts.
+  - User-definable frequency presets.
+- **Instrument Modes:**
+  - **Guitar:** Custom string selection and visualization.
+  - **Piano:** Full 88-key range detection (A0 to C8), optimized for bass frequencies down to 27.5Hz.
+- **Seismograph Visualization:** Provides a rolling history of pitch stability to assist with intonation setup.
+- **Privacy Focused:** Completely offline operation. No analytics, no ads, and no data collection.
 
-To achieve maximum precision and speed, we utilize a **Hybrid Architecture**. We use **Flutter** for the UI and **C++** for the audio engine, connected via **Dart FFI (Foreign Function Interface)**.
+## Technical Architecture
 
-### Why this stack?
+Notefy processes audio using the following pipeline:
 
-1.  **Flutter (Dart):** Allows for rapid UI development and 60fps animations for the tuning needle.
-2.  **C++:** Audio processing requires complex math (autocorrelation) run thousands of times per second. C++ is the industry standard for DSP because it offers direct memory management and SIMD optimizations, avoiding the "Garbage Collection pauses" that happen in Java or Dart.
-3.  **Dart FFI:** Instead of using standard "Method Channels" (which serialize data and are slow), FFI allows Dart to call C++ functions **directly in memory**. This results in near-zero latency when passing audio buffers.
+1.  **Signal Acquisition:** `flutter_audio_capture` retrieves the raw PCM audio stream (Float32 format) from the Android hardware layer.
+2.  **FFI Bridge:** Dart allocates a memory pointer and passes the raw audio buffer directly to the C++ native library (`libnative_tuner.so`).
+3.  **Signal Processing (C++):**
+    - **Noise Gate:** Applies a hysteresis filter to ignore background noise.
+    - **YIN Algorithm:** Calculates pitch estimation.
+    - **Parabolic Interpolation:** Refines the estimate to find the exact fractional frequency.
+4.  **UI Rendering:** The calculated frequency is returned to the Flutter UI layer to update the needle and seismograph at 60fps.
 
----
+### Project Structure
 
-## 3. The Data Pipeline (How it works)
+- `lib/` - Dart/Flutter application code.
+  - `audio_engine.dart` - FFI bindings connecting Dart to C++.
+  - `tuning_model.dart` - Data models for presets and frequency calculations.
+  - `components/` - Custom painters and procedural UI widgets.
+- `android/app/src/main/cpp/` - Native C++ source code.
+  - `notefy.cpp` - Implementation of the DSP algorithms.
+  - `CMakeLists.txt` - Build configuration for the Android NDK.
 
-Here is the lifecycle of a single audio frame, from Microphone to UI:
-
-### Step 1: Signal Acquisition (Dart Layer)
-
-- **Library:** `flutter_audio_capture`
-- **Format:** Raw PCM Data (Pulse Code Modulation).
-- **Type:** 32-bit Float (`List<double>`).
-- **Sample Rate:** 44,100 Hz (Standard Audio).
-- **Buffer Size:** 4096 samples (Selected to capture low frequencies for Piano A0).
-
-### Step 2: The Bridge (FFI Layer)
-
-- Dart allocates a pointer in memory.
-- The raw audio data is copied into this memory block.
-- Dart passes the **memory address (pointer)** to the C++ function `detect_pitch()`.
-
-### Step 3: The Engine (C++ Layer)
-
-The C++ engine receives the pointer. It does **not** use FFT (Fast Fourier Transform), as FFT is imprecise for tuning instruments. Instead, it uses the **YIN Algorithm**.
-
-**The YIN Algorithm Logic:**
-
-1.  **Autocorrelation:** Compares the signal with a time-shifted version of itself to find periodicity.
-2.  **Difference Function:** Calculates the error rate for different pitches.
-3.  **Absolute Threshold:** Finds the first "dip" in error that is significant (ignoring false positives).
-4.  **Parabolic Interpolation:** This is key for precision. Since digital audio is "stepped," the true peak might fall _between_ two samples. We use calculus to estimate the curve between steps to find the exact fractional frequency (e.g., 440.02Hz vs 440.0Hz).
-
-### Step 4: UI Feedback (Dart Layer)
-
-- C++ returns a `float` (e.g., `82.41`).
-- Dart converts `82.41 Hz` -> **E2** (Low E String).
-- Dart calculates "Cents" (how far off the note is) and updates the visual needle.
-
----
-
-## 4. Development Environment Setup
-
-If you are a new developer cloning this repo, follow these steps to compile the native engine.
+## Setup and Installation
 
 ### Prerequisites
 
-1.  **Flutter SDK** (Latest Stable).
-2.  **Android SDK & NDK (Side-by-side):**
-    - Open Android Studio -> SDK Manager -> SDK Tools -> Check "NDK (Side by side)" and "CMake".
+- Flutter SDK (Latest Stable)
+- Android SDK
+- Android NDK (Native Development Kit) & CMake
 
-### Directory Structure
+### Build Instructions
 
-- `lib/` -> Contains all UI code and the Dart `AudioEngine` wrapper.
-- `android/app/src/main/cpp/` -> Contains the **C++ Source code**.
-  - `native_tuner.cpp`: The implementation of the YIN algorithm.
-  - `CMakeLists.txt`: Instructions for the compiler on how to build the `.so` library.
+1.  Clone the repository:
 
-### Compilation
+    ```bash
+    git clone https://github.com/sabak/notefy.git
+    cd notefy
+    ```
 
-The C++ code is compiled automatically by Gradle.
+2.  Install Dart dependencies:
 
-1.  Run `flutter clean` (Removes old binaries).
-2.  Run `flutter pub get`.
-3.  Run `flutter run` (This triggers the NDK build process).
+    ```bash
+    flutter pub get
+    ```
 
----
+3.  Build and Run:
+    ```bash
+    flutter run
+    ```
+    _Note: The initial build may take longer than usual as Gradle compiles the C++ native library._
 
-## 5. Goals & Roadmap
+## License & Commercial Use
 
-### Phase 1: MVP (Completed)
+This project is licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)** license.
 
-- [x] Establish FFI bridge between Dart and C++.
-- [x] Implement basic YIN algorithm in C++.
-- [x] Get microphone stream in Flutter.
+**Summary of Terms:**
 
-### Phase 2: Refinement (Completed)
+- **Non-Commercial:** You are **strictly prohibited** from using this source code, assets, or the application itself for commercial purposes. You cannot sell the app, sell modified versions, or monetize the app via advertisements.
+- **Attribution:** You must give appropriate credit to the original author (Saba Kandashvili) if you redistribute or modify the code.
+- **ShareAlike:** If you remix, transform, or build upon the material, you must distribute your contributions under the same license as the original.
 
-- [x] Optimize C++ memory usage (static buffer reuse, removed malloc inside loop).
-- [x] Implement specific "Guitar Mode" vs "Piano Mode" (frequency filtering: Guitar 75-1400Hz, Piano 25-4500Hz).
-- [x] Add a "Noise Gate" with hysteresis (attack/release frames to prevent flickering).
-
-### Phase 3: Polish
-
-- [ ] Smooth the UI needle movement (moving average/smoothing filter).
-
----
-
-## 6. Mathematical Reference
-
-For the curious developer, we are using the formula:
-$$ Note = 12 \times \log_2(\frac{f}{440}) + 69 $$
-Where $f$ is the frequency returned by our C++ engine.
+See the `LICENSE` file for the full legal text.
