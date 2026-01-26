@@ -63,18 +63,43 @@ class InstrumentString {
   String note;
   int octave;
 
-  InstrumentString({required this.note, required this.octave});
+  InstrumentString({required this.note, required this.octave}) {
+    // Validate note name
+    if (!NOTE_NAMES.contains(note)) {
+      throw ArgumentError('Invalid note name: $note');
+    }
+    // Validate octave range (reasonable range for musical instruments)
+    if (octave < 0 || octave > 9) {
+      throw ArgumentError('Octave must be between 0 and 9, got: $octave');
+    }
+  }
 
   double get frequency => NoteUtils.getFrequency(note, octave);
   String get name => "$note$octave";
 
+  /// Check if frequency is within reasonable range (20Hz - 20kHz)
+  bool get isValidFrequency {
+    final freq = frequency;
+    return freq >= 20.0 && freq <= 20000.0;
+  }
+
   InstrumentString copy() => InstrumentString(note: note, octave: octave);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InstrumentString && note == other.note && octave == other.octave;
+
+  @override
+  int get hashCode => note.hashCode ^ octave.hashCode;
 
   // JSON Serialization
   Map<String, dynamic> toJson() => {'note': note, 'octave': octave};
 
   factory InstrumentString.fromJson(Map<String, dynamic> json) {
-    return InstrumentString(note: json['note'], octave: json['octave']);
+    final note = json['note'] as String? ?? 'A';
+    final octave = json['octave'] as int? ?? 4;
+    return InstrumentString(note: note, octave: octave);
   }
 }
 
@@ -89,7 +114,33 @@ class TuningPreset {
     required this.name,
     required this.style,
     required this.strings,
-  });
+  }) {
+    // Validate at least one string
+    if (strings.isEmpty) {
+      throw ArgumentError('TuningPreset must have at least one string');
+    }
+    // Validate max strings (reasonable limit)
+    if (strings.length > 12) {
+      throw ArgumentError('TuningPreset cannot have more than 12 strings');
+    }
+    // Validate all strings have valid frequencies
+    for (final s in strings) {
+      if (!s.isValidFrequency) {
+        throw ArgumentError('String ${s.name} has invalid frequency');
+      }
+    }
+  }
+
+  /// Check if all strings have valid frequencies
+  bool get isValid => strings.every((s) => s.isValidFrequency);
+
+  /// Get the lowest frequency in the preset
+  double get lowestFrequency =>
+      strings.map((s) => s.frequency).reduce((a, b) => a < b ? a : b);
+
+  /// Get the highest frequency in the preset
+  double get highestFrequency =>
+      strings.map((s) => s.frequency).reduce((a, b) => a > b ? a : b);
 
   // Factory Presets
   static TuningPreset standard6String() => TuningPreset(

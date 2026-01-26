@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/models/tuning_model.dart';
@@ -39,6 +40,10 @@ class TunerController extends ChangeNotifier {
   bool _isInStandby = false;
   Timer? _standbyTimer;
   double _standbyProgress = 0.0;
+
+  // Haptic feedback state
+  bool _wasInTune = false;
+  static const double _inTuneThreshold = 5.0; // cents
 
   // Animation controllers (will be set by view)
   AnimationController? _standbyAnimationController;
@@ -210,6 +215,14 @@ class TunerController extends ChangeNotifier {
     }
 
     _targetCents = cents;
+
+    // Haptic feedback when entering "in tune" zone
+    final bool isInTune = cents.abs() < _inTuneThreshold;
+    if (isInTune && !_wasInTune) {
+      HapticFeedback.mediumImpact();
+    }
+    _wasInTune = isInTune;
+
     _state = _state.copyWith(
       currentPitch: freq,
       note: noteName,
