@@ -55,6 +55,16 @@ static std::mutex g_mutex;
 #define NOISE_GATE_RELEASE_FRAMES 5 // Frames before gate "closes"
 
 // ============================================================================
+// Pitch Stability Configuration
+// ============================================================================
+#define PITCH_HISTORY_SIZE 5            // Median filter window size (unused now)
+#define MIN_CONFIDENCE_THRESHOLD 0.50f  // Only reject very low confidence (noise)
+#define OCTAVE_JUMP_THRESHOLD_LOW 0.45f // Ratio for octave-down detection
+#define OCTAVE_JUMP_THRESHOLD_HIGH 0.55f
+#define OCTAVE_JUMP_THRESHOLD_2X_LOW 1.8f // Ratio for octave-up detection
+#define OCTAVE_JUMP_THRESHOLD_2X_HIGH 2.2f
+
+// ============================================================================
 // Static buffers for reuse (avoids malloc/free overhead in real-time)
 // ============================================================================
 static float *g_yinBuffer = nullptr;
@@ -65,6 +75,11 @@ static int g_gateOpenCounter = 0;      // Counts frames above threshold
 static int g_gateCloseCounter = 0;     // Counts frames below threshold
 static bool g_gateIsOpen = false;      // Current gate state
 static float g_lastValidPitch = -1.0f; // Last detected pitch for stability
+
+// Pitch stability state (median filter)
+static float g_pitchHistory[PITCH_HISTORY_SIZE] = {0};
+static int g_pitchHistoryIndex = 0;
+static int g_pitchHistoryCount = 0; // How many valid samples we have
 
 // Current mode settings
 static int g_currentMode = MODE_CHROMATIC;
@@ -99,11 +114,18 @@ extern "C"
             break;
         }
 
-        // Reset gate state on mode change
+        // Reset gate state and pitch stability on mode change
         g_gateOpenCounter = 0;
         g_gateCloseCounter = 0;
         g_gateIsOpen = false;
         g_lastValidPitch = -1.0f;
+        // Reset pitch history
+        for (int i = 0; i < PITCH_HISTORY_SIZE; i++)
+        {
+            g_pitchHistory[i] = 0.0f;
+        }
+        g_pitchHistoryIndex = 0;
+        g_pitchHistoryCount = 0;
     }
 
     // ========================================================================
@@ -184,6 +206,92 @@ extern "C"
     }
 
     // ========================================================================
+    // Helper: Median filter for pitch stability (reduces jitter)
+    // Returns median of last N pitch values
+    // ========================================================================
+    static float apply_median_filter(float newPitch)
+    {
+        // Add to history
+        g_pitchHistory[g_pitchHistoryIndex] = newPitch;
+        g_pitchHistoryIndex = (g_pitchHistoryIndex + 1) % PITCH_HISTORY_SIZE;
+        if (g_pitchHistoryCount < PITCH_HISTORY_SIZE)
+        {
+            g_pitchHistoryCount++;
+        }
+
+        // Need at least 3 samples for meaningful median
+        if (g_pitchHistoryCount < 3)
+        {
+            return newPitch;
+        }
+
+        // Copy valid samples and sort
+        float sorted[PITCH_HISTORY_SIZE];
+        int count = g_pitchHistoryCount;
+        for (int i = 0; i < count; i++)
+        {
+            sorted[i] = g_pitchHistory[i];
+        }
+
+        // Simple insertion sort (small array, fast enough)
+        for (int i = 1; i < count; i++)
+        {
+            float key = sorted[i];
+            int j = i - 1;
+            while (j >= 0 && sorted[j] > key)
+            {
+                sorted[j + 1] = sorted[j];
+                j--;
+            }
+            sorted[j + 1] = key;
+        }
+
+        // Return median
+        return sorted[count / 2];
+    }
+
+    // ========================================================================
+    // Helper: Correct octave errors (YIN sometimes jumps octaves)
+    // ========================================================================
+    static float correct_octave_error(float pitchHz)
+    {
+        if (g_lastValidPitch <= 0.0f)
+        {
+            return pitchHz; // No reference yet
+        }
+
+        float ratio = pitchHz / g_lastValidPitch;
+
+        // Detected pitch is ~2x the last valid pitch (jumped up an octave)
+        if (ratio > OCTAVE_JUMP_THRESHOLD_2X_LOW && ratio < OCTAVE_JUMP_THRESHOLD_2X_HIGH)
+        {
+            return pitchHz / 2.0f;
+        }
+
+        // Detected pitch is ~0.5x the last valid pitch (jumped down an octave)
+        if (ratio > OCTAVE_JUMP_THRESHOLD_LOW && ratio < OCTAVE_JUMP_THRESHOLD_HIGH)
+        {
+            return pitchHz * 2.0f;
+        }
+
+        return pitchHz;
+    }
+
+    // ========================================================================
+    // Helper: Reset pitch stability state
+    // ========================================================================
+    static void reset_pitch_stability()
+    {
+        for (int i = 0; i < PITCH_HISTORY_SIZE; i++)
+        {
+            g_pitchHistory[i] = 0.0f;
+        }
+        g_pitchHistoryIndex = 0;
+        g_pitchHistoryCount = 0;
+        g_lastValidPitch = -1.0f;
+    }
+
+    // ========================================================================
     // Noise Gate: Determines if signal should be processed
     // Uses hysteresis to avoid rapid on/off switching
     // ========================================================================
@@ -217,7 +325,7 @@ extern "C"
             if (g_gateCloseCounter >= NOISE_GATE_RELEASE_FRAMES)
             {
                 g_gateIsOpen = false;
-                g_lastValidPitch = -1.0f;
+                reset_pitch_stability(); // Reset pitch history when gate closes
             }
         }
 
@@ -403,6 +511,12 @@ extern "C"
             return -1.0f;
         }
 
+        // Low confidence = no pitch detected (don't fake it)
+        if (confidence < MIN_CONFIDENCE_THRESHOLD)
+        {
+            return -1.0f;
+        }
+
         float betterTau = yin_parabolic_interpolation(g_yinBuffer, tau, length);
         float pitchHz = (float)sampleRate / betterTau;
 
@@ -412,7 +526,7 @@ extern "C"
             return -1.0f;
         }
 
-        // Store as last valid pitch for stability
+        // Store as last valid pitch (for reference only, not used to fake readings)
         g_lastValidPitch = pitchHz;
 
         return pitchHz;
@@ -460,17 +574,24 @@ extern "C"
             return -1.0f;
         }
 
+        // Always report confidence, even if low
+        if (outConfidence != nullptr)
+        {
+            *outConfidence = confidence;
+        }
+
+        // Low confidence = no pitch detected (don't fake it)
+        if (confidence < MIN_CONFIDENCE_THRESHOLD)
+        {
+            return -1.0f;
+        }
+
         float betterTau = yin_parabolic_interpolation(g_yinBuffer, tau, length);
         float pitchHz = (float)sampleRate / betterTau;
 
         if (pitchHz < g_minFrequency || pitchHz > g_maxFrequency)
         {
             return -1.0f;
-        }
-
-        if (outConfidence != nullptr)
-        {
-            *outConfidence = confidence;
         }
 
         g_lastValidPitch = pitchHz;
@@ -502,7 +623,7 @@ extern "C"
         g_gateOpenCounter = 0;
         g_gateCloseCounter = 0;
         g_gateIsOpen = false;
-        g_lastValidPitch = -1.0f;
+        reset_pitch_stability();
         g_currentMode = MODE_CHROMATIC;
         g_minFrequency = DEFAULT_MIN_FREQ;
         g_maxFrequency = DEFAULT_MAX_FREQ;
