@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -129,10 +130,91 @@ class _TunerScreenState extends State<TunerScreen>
     );
   }
 
-  void _showBugReportSnackbar() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Please email bugs to ${AppConstants.supportEmail}"),
+  void _showBugReportDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF2D2D44),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.bug_report, color: AppColors.primaryAccent),
+            const SizedBox(width: 12),
+            const Text("Report a Bug", style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Found a bug? Help us improve Notefy by sending a detailed description to:",
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () {
+                Clipboard.setData(
+                  const ClipboardData(text: AppConstants.supportEmail),
+                );
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text("Email copied to clipboard!"),
+                    backgroundColor: AppColors.inTuneColor,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryAccent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.primaryAccent.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        AppConstants.supportEmail,
+                        style: TextStyle(
+                          color: AppColors.primaryAccent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    Icon(Icons.copy, color: AppColors.primaryAccent, size: 20),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "Please include:\n• What you were doing\n• What went wrong\n• Your device model",
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Close"),
+          ),
+        ],
       ),
     );
   }
@@ -151,7 +233,7 @@ class _TunerScreenState extends State<TunerScreen>
       drawer: AppDrawer(
         currentMode: _controller.tuningMode,
         onModeSelected: _handleModeChange,
-        onReportBug: _showBugReportSnackbar,
+        onReportBug: _showBugReportDialog,
       ),
       body: SafeArea(child: _buildBody()),
     );

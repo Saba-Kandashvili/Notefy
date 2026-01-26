@@ -43,7 +43,16 @@ class NoteUtils {
     return TuningSettings.a4Reference * pow(2, (midiNote - 69) / 12);
   }
 
-  static InstrumentString calculateNextLowerString(InstrumentString current) {
+  /// Calculate the next lower string, avoiding duplicates from existing strings.
+  /// If we can't go lower, we go higher instead.
+  static InstrumentString calculateNextLowerString(
+    InstrumentString current, {
+    List<InstrumentString>? existingStrings,
+  }) {
+    final existing = existingStrings ?? [];
+    final existingNotes = existing.map((s) => '${s.note}${s.octave}').toSet();
+
+    // Try going down by perfect 4th first
     int idx = NOTE_NAMES.indexOf(current.note);
     int newIdx = idx - 5;
     int newOct = current.octave;
@@ -51,12 +60,77 @@ class NoteUtils {
       newIdx += 12;
       newOct -= 1;
     }
-    return InstrumentString(note: NOTE_NAMES[newIdx], octave: newOct);
+
+    // If octave is valid and not a duplicate, use it
+    if (newOct >= 0 &&
+        !existingNotes.contains('${NOTE_NAMES[newIdx]}$newOct')) {
+      return InstrumentString(note: NOTE_NAMES[newIdx], octave: newOct);
+    }
+
+    // Find the lowest existing note
+    int lowestOctave = 9;
+    int lowestNoteIdx = 11;
+    for (final s in existing) {
+      if (s.octave < lowestOctave ||
+          (s.octave == lowestOctave &&
+              NOTE_NAMES.indexOf(s.note) < lowestNoteIdx)) {
+        lowestOctave = s.octave;
+        lowestNoteIdx = NOTE_NAMES.indexOf(s.note);
+      }
+    }
+
+    // Try each semitone going down from current lowest
+    for (int semitone = 1; semitone <= 120; semitone++) {
+      int tryIdx = lowestNoteIdx - semitone;
+      int tryOct = lowestOctave;
+      while (tryIdx < 0) {
+        tryIdx += 12;
+        tryOct -= 1;
+      }
+      if (tryOct >= 0) {
+        final noteName = NOTE_NAMES[tryIdx % 12];
+        if (!existingNotes.contains('$noteName$tryOct')) {
+          return InstrumentString(note: noteName, octave: tryOct);
+        }
+      }
+    }
+
+    // If can't go lower, find highest and go up
+    int highestOctave = 0;
+    int highestNoteIdx = 0;
+    for (final s in existing) {
+      if (s.octave > highestOctave ||
+          (s.octave == highestOctave &&
+              NOTE_NAMES.indexOf(s.note) > highestNoteIdx)) {
+        highestOctave = s.octave;
+        highestNoteIdx = NOTE_NAMES.indexOf(s.note);
+      }
+    }
+
+    // Try going up
+    for (int semitone = 1; semitone <= 120; semitone++) {
+      int tryIdx = highestNoteIdx + semitone;
+      int tryOct = highestOctave;
+      while (tryIdx >= 12) {
+        tryIdx -= 12;
+        tryOct += 1;
+      }
+      if (tryOct <= 9) {
+        final noteName = NOTE_NAMES[tryIdx];
+        if (!existingNotes.contains('$noteName$tryOct')) {
+          return InstrumentString(note: noteName, octave: tryOct);
+        }
+      }
+    }
+
+    // Fallback (should never reach here with 120 notes range)
+    return InstrumentString(note: 'A', octave: 4);
   }
 }
 
 // --- DATA CLASSES ---
 
+/// @deprecated HeadstockStyle is no longer used - the UI auto-adapts to string count
 enum HeadstockStyle { oneWay, twoWay }
 
 class InstrumentString {
@@ -77,10 +151,11 @@ class InstrumentString {
   double get frequency => NoteUtils.getFrequency(note, octave);
   String get name => "$note$octave";
 
-  /// Check if frequency is within reasonable range (20Hz - 20kHz)
+  /// Check if frequency is within reasonable range (8Hz - 20kHz)
+  /// 8Hz allows for sub-bass notes like C0 (~16Hz) with some margin
   bool get isValidFrequency {
     final freq = frequency;
-    return freq >= 20.0 && freq <= 20000.0;
+    return freq >= 8.0 && freq <= 20000.0;
   }
 
   InstrumentString copy() => InstrumentString(note: note, octave: octave);
@@ -106,23 +181,21 @@ class InstrumentString {
 class TuningPreset {
   String id;
   String name;
+  @Deprecated('HeadstockStyle is no longer used - UI auto-adapts')
   HeadstockStyle style;
   List<InstrumentString> strings;
 
   TuningPreset({
     required this.id,
     required this.name,
-    required this.style,
+    this.style = HeadstockStyle.twoWay, // Made optional with default
     required this.strings,
   }) {
     // Validate at least one string
     if (strings.isEmpty) {
       throw ArgumentError('TuningPreset must have at least one string');
     }
-    // Validate max strings (reasonable limit)
-    if (strings.length > 12) {
-      throw ArgumentError('TuningPreset cannot have more than 12 strings');
-    }
+    // No upper limit - support any instrument (harpeji, harp, piano, etc.)
     // Validate all strings have valid frequencies
     for (final s in strings) {
       if (!s.isValidFrequency) {

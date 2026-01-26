@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/models/tuning_model.dart';
+import '../../../../core/theme/app_theme.dart';
 
+/// A fully dynamic string selector that always fits the available space.
+/// Scales automatically for any number of strings (1-48+), no scrolling needed.
 class DynamicHeadstock extends StatelessWidget {
   final TuningPreset preset;
   final InstrumentString? selectedString;
@@ -17,149 +20,220 @@ class DynamicHeadstock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // Wood-ish background container for the "Headstock" area
-      padding: const EdgeInsets.all(16),
+      height: 100,
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E2C),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white12),
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF252538), Color(0xFF1E1E2C)],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: preset.style == HeadstockStyle.oneWay
-          ? _buildOneWayLayout()
-          : _buildTwoWayLayout(),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Row(
+        children: List.generate(preset.strings.length, (index) {
+          final string = preset.strings[index];
+          final isSelected = selectedString == string;
+          final stringCount = preset.strings.length;
+
+          // String thickness scales with count (thicker bass strings)
+          final maxThickness = stringCount <= 6
+              ? 5.0
+              : (stringCount <= 12 ? 4.0 : 3.0);
+          final thicknessRange = stringCount <= 6
+              ? 3.0
+              : (stringCount <= 12 ? 2.0 : 1.5);
+          final thickness =
+              maxThickness - (index / stringCount) * thicknessRange;
+
+          return Expanded(
+            child: _StringButton(
+              string: string,
+              isSelected: isSelected,
+              thickness: thickness,
+              onTap: () => onStringSelected(string),
+              index: index,
+              total: stringCount,
+            ),
+          );
+        }),
+      ),
     );
   }
+}
 
-  // --- LAYOUTS ---
+class _StringButton extends StatelessWidget {
+  final InstrumentString string;
+  final bool isSelected;
+  final double thickness;
+  final VoidCallback onTap;
+  final int index;
+  final int total;
 
-  // Ibanez/Fender Style: Neck on left, all pegs on right
-  Widget _buildOneWayLayout() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // The "Wood" Headstock Shape
-        Container(
-          width: 60,
-          height: preset.strings.length * 50.0 + 20,
-          decoration: BoxDecoration(
-            color: const Color(0xFF3E2723), // Dark Wood
-            borderRadius: BorderRadius.circular(8),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF5D4037), Color(0xFF3E2723)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        // The Pegs
-        Column(
-          children: preset.strings.map((s) => _buildPeg(s, true)).toList(),
-        ),
-      ],
-    );
-  }
+  const _StringButton({
+    required this.string,
+    required this.isSelected,
+    required this.thickness,
+    required this.onTap,
+    required this.index,
+    required this.total,
+  });
 
-  // Gibson Style: Neck in middle, pegs on both sides
-  Widget _buildTwoWayLayout() {
-    // Split strings: Half left, Half right
-    // If 7 strings: 4 Left, 3 Right
-    int midPoint = (preset.strings.length / 2).ceil();
-    var leftStrings = preset.strings.sublist(0, midPoint);
-    var rightStrings = preset.strings.sublist(midPoint);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Left Pegs
-        Column(children: leftStrings.map((s) => _buildPeg(s, false)).toList()),
-        // The "Wood" Headstock Shape
-        Container(
-          width: 80, // Wider for 3+3 style
-          height: (midPoint * 60.0) + 20,
-          decoration: BoxDecoration(
-            color: const Color(0xFF3E2723),
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(16),
-              bottom: Radius.circular(4),
-            ),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF5D4037), Color(0xFF3E2723)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: const Center(
-            child: Text(
-              "Notefy",
-              style: TextStyle(
-                color: Colors.white24,
-                fontWeight: FontWeight.bold,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
-        ),
-        // Right Pegs
-        Column(children: rightStrings.map((s) => _buildPeg(s, true)).toList()),
-      ],
-    );
-  }
-
-  // --- PEG WIDGET ---
-  Widget _buildPeg(InstrumentString string, bool isRightSide) {
-    bool isSelected = selectedString == string;
+  @override
+  Widget build(BuildContext context) {
+    // Font size scales with string count
+    final noteFontSize = total <= 4
+        ? 18.0
+        : (total <= 8 ? 14.0 : (total <= 16 ? 11.0 : 9.0));
+    final octaveFontSize = total <= 4
+        ? 12.0
+        : (total <= 8 ? 10.0 : (total <= 16 ? 8.0 : 7.0));
+    final showOctave = total <= 16; // Hide octave for very dense layouts
 
     return GestureDetector(
-      onTap: () => onStringSelected(string),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Line connecting peg to headstock (String visualization)
-            if (isRightSide)
-              Container(width: 15, height: 2, color: Colors.grey),
-
-            // The Peg Circle
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isSelected
-                    ? Colors.greenAccent
-                    : const Color(0xFF2D2D44),
-                border: Border.all(
-                  color: isSelected ? Colors.white : Colors.white24,
-                  width: 2,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: Colors.greenAccent.withOpacity(0.5),
-                          blurRadius: 10,
-                        ),
-                      ]
-                    : [],
-              ),
-              child: Center(
-                child: Text(
-                  string.name,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.black : Colors.white,
+            // Note label at top
+            Flexible(
+              flex: 2,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: total <= 6 ? 8 : (total <= 12 ? 5 : 3),
+                    vertical: total <= 6 ? 4 : 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.inTuneColor
+                        : Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(total <= 8 ? 8 : 4),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.inTuneColor
+                          : Colors.white.withValues(alpha: 0.15),
+                      width: 1,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: AppColors.inTuneColor.withValues(
+                                alpha: 0.4,
+                              ),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Text(
+                    string.note,
+                    style: TextStyle(
+                      fontSize: noteFontSize,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.black : Colors.white,
+                    ),
                   ),
                 ),
               ),
             ),
 
-            if (!isRightSide)
-              Container(width: 15, height: 2, color: Colors.grey),
+            const SizedBox(height: 4),
+
+            // Visual string line
+            Expanded(
+              flex: 3,
+              child: Center(
+                child: Container(
+                  width: thickness,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(thickness / 2),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: isSelected
+                          ? [
+                              AppColors.inTuneColor,
+                              AppColors.inTuneColor.withValues(alpha: 0.6),
+                            ]
+                          : [
+                              _getStringColor(index, total),
+                              _getStringColor(
+                                index,
+                                total,
+                              ).withValues(alpha: 0.4),
+                            ],
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: AppColors.inTuneColor.withValues(
+                                alpha: 0.5,
+                              ),
+                              blurRadius: 6,
+                            ),
+                          ]
+                        : null,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            // Octave number at bottom (hidden for very dense layouts)
+            if (showOctave)
+              Flexible(
+                flex: 1,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '${string.octave}',
+                    style: TextStyle(
+                      fontSize: octaveFontSize,
+                      color: isSelected
+                          ? AppColors.inTuneColor
+                          : Colors.white.withValues(alpha: 0.5),
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  Color _getStringColor(int index, int total) {
+    if (total <= 1) return const Color(0xFFB8860B);
+
+    // Bass strings are more bronze/copper, treble strings are more silver
+    final progress = index / (total - 1);
+
+    if (progress < 0.5) {
+      // Bass strings - bronze/copper
+      return Color.lerp(
+        const Color(0xFFCD853F), // Peru/bronze
+        const Color(0xFFB8860B), // Dark goldenrod
+        progress * 2,
+      )!;
+    } else {
+      // Treble strings - silver/steel
+      return Color.lerp(
+        const Color(0xFFB8860B),
+        const Color(0xFFC0C0C0), // Silver
+        (progress - 0.5) * 2,
+      )!;
+    }
   }
 }

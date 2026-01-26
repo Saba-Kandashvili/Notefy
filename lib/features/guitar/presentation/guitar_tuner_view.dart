@@ -57,7 +57,7 @@ class GuitarTunerView extends StatelessWidget {
 
     return Column(
       children: [
-        // Header with settings and preset selector
+        // Header with edit and preset selector
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
@@ -65,7 +65,7 @@ class GuitarTunerView extends StatelessWidget {
             children: [
               IconButton(
                 icon: const Icon(
-                  Icons.settings,
+                  Icons.edit_outlined,
                   color: AppColors.textSecondary,
                 ),
                 onPressed: () => _openEditor(context),
@@ -102,25 +102,22 @@ class GuitarTunerView extends StatelessWidget {
           ),
         ),
 
-        // Headstock visualization
-        Expanded(
-          flex: 4,
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: DynamicHeadstock(
-                preset: controller.currentPreset,
-                selectedString: targetString,
-                onStringSelected: (str) => controller.selectString(str),
-              ),
-            ),
+        // String selector - compact horizontal bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: DynamicHeadstock(
+            preset: controller.currentPreset,
+            selectedString: targetString,
+            onStringSelected: (str) => controller.selectString(str),
           ),
         ),
+
+        const SizedBox(height: 12),
 
         // Target string info
         if (targetString != null)
           Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 8),
+            padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               "Target: ${targetString.name} (${targetString.frequency.toStringAsFixed(1)} Hz)",
               style: const TextStyle(
@@ -131,16 +128,15 @@ class GuitarTunerView extends StatelessWidget {
           )
         else
           const Padding(
-            padding: EdgeInsets.only(top: 8, bottom: 8),
+            padding: EdgeInsets.only(bottom: 8),
             child: Text(
               "Select a string to tune",
               style: TextStyle(color: AppColors.textDisabled, fontSize: 14),
             ),
           ),
 
-        // Seismograph
+        // Seismograph - takes remaining space
         Expanded(
-          flex: 5,
           child: SeismographWidget(
             trailPositions: controller.trailPositions,
             targetNote: targetString?.name ?? "",

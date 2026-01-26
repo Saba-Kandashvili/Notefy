@@ -216,9 +216,12 @@ class TunerController extends ChangeNotifier {
 
     _targetCents = cents;
 
-    // Haptic feedback when entering "in tune" zone
+    // Haptic feedback when entering "in tune" zone (only when target note selected)
+    final bool hasTarget =
+        (_tuningMode == TuningMode.guitar && _targetString != null) ||
+        (_tuningMode == TuningMode.piano && _selectedPianoKey != null);
     final bool isInTune = cents.abs() < _inTuneThreshold;
-    if (isInTune && !_wasInTune) {
+    if (hasTarget && isInTune && !_wasInTune) {
       HapticFeedback.mediumImpact();
     }
     _wasInTune = isInTune;
