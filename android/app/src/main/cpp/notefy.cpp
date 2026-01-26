@@ -14,6 +14,7 @@
 #include <math.h>
 #include <float.h>
 #include <string.h>
+#include <mutex>
 
 // ============================================================================
 // YIN Algorithm Configuration
@@ -21,7 +22,11 @@
 
 // Threshold for pitch detection (lower = more sensitive, higher = fewer false positives)
 // For piano tuning, 0.10-0.15 works well
-#define YIN_THRESHOLD 0.10f
+// Now configurable at runtime via set_yin_threshold()
+static float g_yinThreshold = 0.15f;
+
+// Thread safety mutex for all global state
+static std::mutex g_mutex;
 
 // ============================================================================
 // Tuning Mode Definitions
@@ -75,6 +80,7 @@ extern "C"
     // ========================================================================
     __attribute__((visibility("default"))) __attribute__((used)) void set_tuning_mode(int mode)
     {
+        std::lock_guard<std::mutex> lock(g_mutex);
         g_currentMode = mode;
 
         // Modes only affect noise gate threshold
@@ -106,6 +112,7 @@ extern "C"
     // ========================================================================
     __attribute__((visibility("default"))) __attribute__((used)) void set_frequency_range(float minFreq, float maxFreq)
     {
+        std::lock_guard<std::mutex> lock(g_mutex);
         if (minFreq > 0.0f && minFreq < maxFreq)
         {
             g_minFrequency = minFreq;
@@ -118,6 +125,7 @@ extern "C"
     // ========================================================================
     __attribute__((visibility("default"))) __attribute__((used)) void reset_frequency_range()
     {
+        std::lock_guard<std::mutex> lock(g_mutex);
         g_minFrequency = DEFAULT_MIN_FREQ;
         g_maxFrequency = DEFAULT_MAX_FREQ;
     }
@@ -127,9 +135,23 @@ extern "C"
     // ========================================================================
     __attribute__((visibility("default"))) __attribute__((used)) void set_noise_threshold(float threshold)
     {
+        std::lock_guard<std::mutex> lock(g_mutex);
         if (threshold > 0.0f && threshold < 1.0f)
         {
             g_noiseThreshold = threshold;
+        }
+    }
+
+    // ========================================================================
+    // Configuration: Set YIN algorithm threshold
+    // Lower = more sensitive (0.05-0.15), Higher = fewer false positives (0.15-0.3)
+    // ========================================================================
+    __attribute__((visibility("default"))) __attribute__((used)) void set_yin_threshold(float threshold)
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        if (threshold > 0.05f && threshold < 0.5f)
+        {
+            g_yinThreshold = threshold;
         }
     }
 
@@ -262,11 +284,11 @@ extern "C"
             maxTau = halfLen - 1;
 
         int bestTau = -1;
-        float bestValue = YIN_THRESHOLD;
+        float bestValue = g_yinThreshold;
 
         for (int tau = minTau; tau < maxTau; tau++)
         {
-            if (yinBuffer[tau] < YIN_THRESHOLD)
+            if (yinBuffer[tau] < g_yinThreshold)
             {
                 while (tau + 1 < maxTau && yinBuffer[tau + 1] < yinBuffer[tau])
                 {
@@ -346,6 +368,7 @@ extern "C"
     // ========================================================================
     __attribute__((visibility("default"))) __attribute__((used)) float detect_pitch(float *audioData, int length, int sampleRate)
     {
+        std::lock_guard<std::mutex> lock(g_mutex);
         if (audioData == nullptr || length < 64)
         {
             return -1.0f;
@@ -400,6 +423,7 @@ extern "C"
     // ========================================================================
     __attribute__((visibility("default"))) __attribute__((used)) float detect_pitch_with_confidence(float *audioData, int length, int sampleRate, float *outConfidence)
     {
+        std::lock_guard<std::mutex> lock(g_mutex);
         if (outConfidence != nullptr)
         {
             *outConfidence = 0.0f;
@@ -466,6 +490,7 @@ extern "C"
     // ========================================================================
     __attribute__((visibility("default"))) __attribute__((used)) void cleanup_pitch_detector()
     {
+        std::lock_guard<std::mutex> lock(g_mutex);
         if (g_yinBuffer != nullptr)
         {
             free(g_yinBuffer);
@@ -482,5 +507,6 @@ extern "C"
         g_minFrequency = DEFAULT_MIN_FREQ;
         g_maxFrequency = DEFAULT_MAX_FREQ;
         g_noiseThreshold = NOISE_GATE_CHROMATIC;
+        g_yinThreshold = 0.15f;
     }
 }

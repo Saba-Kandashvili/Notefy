@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../tuning_model.dart';
+import '../../../../core/models/tuning_model.dart';
 
 class DynamicHeadstock extends StatelessWidget {
   final TuningPreset preset;

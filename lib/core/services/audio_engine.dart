@@ -36,6 +36,10 @@ typedef DartSetTuningMode = void Function(int);
 typedef NativeSetNoiseThreshold = ffi.Void Function(ffi.Float);
 typedef DartSetNoiseThreshold = void Function(double);
 
+// Set YIN algorithm threshold function
+typedef NativeSetYinThreshold = ffi.Void Function(ffi.Float);
+typedef DartSetYinThreshold = void Function(double);
+
 // Set frequency range function
 typedef NativeSetFrequencyRange = ffi.Void Function(ffi.Float, ffi.Float);
 typedef DartSetFrequencyRange = void Function(double, double);
@@ -89,6 +93,7 @@ class AudioEngine {
   DartCleanup? _cleanup;
   DartSetTuningMode? _setTuningMode;
   DartSetNoiseThreshold? _setNoiseThreshold;
+  DartSetYinThreshold? _setYinThreshold;
   DartSetFrequencyRange? _setFrequencyRange;
   DartResetFrequencyRange? _resetFrequencyRange;
   DartIsGateOpen? _isGateOpen;
@@ -162,6 +167,16 @@ class AudioEngine {
     }
 
     try {
+      _setYinThreshold = _lib
+          .lookup<ffi.NativeFunction<NativeSetYinThreshold>>(
+            'set_yin_threshold',
+          )
+          .asFunction();
+    } catch (e) {
+      _setYinThreshold = null;
+    }
+
+    try {
       _setFrequencyRange = _lib
           .lookup<ffi.NativeFunction<NativeSetFrequencyRange>>(
             'set_frequency_range',
@@ -217,6 +232,14 @@ class AudioEngine {
     _setNoiseThreshold?.call(threshold);
   }
 
+  /// Set YIN algorithm threshold (0.05 to 0.5)
+  /// Lower values = more sensitive pitch detection (may have more false positives)
+  /// Higher values = stricter detection (fewer false positives, may miss quiet notes)
+  /// Recommended: 0.10-0.15 for most instruments
+  void setYinThreshold(double threshold) {
+    _setYinThreshold?.call(threshold);
+  }
+
   /// Check if the noise gate is currently open (signal detected)
   bool get isGateOpen => _isGateOpen?.call() ?? false;
 
@@ -270,10 +293,8 @@ class AudioEngine {
 
     _ensureBufferSize(audioData.length);
 
-    // Direct copy from Float32List is faster
-    for (var i = 0; i < audioData.length; i++) {
-      _audioBuffer![i] = audioData[i];
-    }
+    // Direct memory copy using asTypedList - much faster than element-by-element
+    _audioBuffer!.asTypedList(audioData.length).setAll(0, audioData);
 
     return _detectPitch(_audioBuffer!, audioData.length, sampleRate);
   }
@@ -284,9 +305,8 @@ class AudioEngine {
 
     _ensureBufferSize(audioData.length);
 
-    for (var i = 0; i < audioData.length; i++) {
-      _audioBuffer![i] = audioData[i];
-    }
+    // Direct memory copy using asTypedList - much faster than element-by-element
+    _audioBuffer!.asTypedList(audioData.length).setAll(0, audioData);
 
     _confidencePtr![0] = 0.0;
 
@@ -320,13 +340,18 @@ class AudioEngine {
 
   /// Release native resources
   void dispose() {
-    // Call native cleanup if available
-    _cleanup?.call();
+    // Call native cleanup if available (wrapped in try-catch for safety)
+    try {
+      _cleanup?.call();
+    } catch (e) {
+      // Ignore cleanup errors
+    }
 
     // Free allocated memory
     if (_audioBuffer != null) {
       calloc.free(_audioBuffer!);
       _audioBuffer = null;
+      _audioBufferSize = 0;
     }
     if (_confidencePtr != null) {
       calloc.free(_confidencePtr!);

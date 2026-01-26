@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../tuning_model.dart';
+import '../../../core/models/tuning_model.dart';
 
 class TuningEditor extends StatefulWidget {
   final TuningPreset initialPreset;
