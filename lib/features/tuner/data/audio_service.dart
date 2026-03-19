@@ -45,6 +45,7 @@ class AudioService {
     required PitchCallback onPitchDetected,
     required VoidCallback onNoPitch,
     required ErrorCallback onError,
+    void Function(Float32List data)? onRawData,
   }) async {
     if (!_isInitialized) return false;
 
@@ -52,6 +53,8 @@ class AudioService {
       await _audioRecorder.start(
         (Float32List data) {
           try {
+            if (onRawData != null) onRawData(data);
+
             final pitch = _engine.processAudioFloat32(data);
             if (pitch > AppConstants.minDetectableFrequency &&
                 pitch < AppConstants.maxDetectableFrequency) {
@@ -87,6 +90,11 @@ class AudioService {
     }
     WakelockPlus.disable();
     _isRecording = false;
+  }
+
+  /// Detect inharmonicity coefficient B for a given expected fundamental frequency
+  double detectInharmonicity(Float32List data, double expectedF1) {
+    return _engine.detectInharmonicity(data, expectedF1);
   }
 
   /// Set the tuning mode (affects noise gate sensitivity)

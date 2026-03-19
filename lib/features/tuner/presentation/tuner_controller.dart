@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/models/tuning_model.dart';
 import '../../../core/services/audio_engine.dart';
 import '../../piano/domain/piano_key.dart';
+import '../../piano/domain/piano_tuning_profile.dart';
 import '../data/audio_service.dart';
 import '../data/tuner_repository.dart';
 import '../domain/tuner_state.dart';
@@ -35,6 +37,11 @@ class TunerController extends ChangeNotifier {
 
   // Piano state
   PianoKey? _selectedPianoKey;
+  PianoTuningProfile _pianoProfile = PianoTuningProfile.equalTemperament();
+  List<PianoKey> _stretchedPianoKeys = pianoKeys;
+  bool _isCalibrating = false;
+  double _lastDetectedB = -1.0;
+  final Map<int, double> _calibrationMeasurements = {};
 
   // Standby state
   bool _isInStandby = false;
@@ -62,6 +69,10 @@ class TunerController extends ChangeNotifier {
   InstrumentString? get targetString => _targetString;
   List<TuningPreset> get customPresets => _customPresets;
   PianoKey? get selectedPianoKey => _selectedPianoKey;
+  List<PianoKey> get stretchedPianoKeys => _stretchedPianoKeys;
+  PianoTuningProfile get pianoProfile => _pianoProfile;
+  bool get isCalibrating => _isCalibrating;
+  double get lastDetectedB => _lastDetectedB;
 
   bool get isInitialized => _audioService.isInitialized;
   bool get isRecording => _audioService.isRecording;
@@ -105,12 +116,18 @@ class TunerController extends ChangeNotifier {
     _currentPreset =
         await _repository.loadGuitarPreset() ?? TuningPreset.standard6String();
     _customPresets = await _repository.loadCustomPresets();
+
+    final savedProfile = await _repository.loadPianoProfile();
+    if (savedProfile != null) {
+      await applyPianoProfile(savedProfile);
+    }
   }
 
   Future<void> _saveState() async {
     await _repository.saveTuningMode(_tuningMode);
     await _repository.saveGuitarPreset(_currentPreset);
     await _repository.saveCustomPresets(_customPresets);
+    await _repository.savePianoProfile(_pianoProfile);
   }
 
   /// Start recording
@@ -124,12 +141,35 @@ class TunerController extends ChangeNotifier {
       onPitchDetected: _onPitchDetected,
       onNoPitch: _onNoPitchDetected,
       onError: _onError,
+      onRawData: _isCalibrating ? _onRawAudioData : null,
     );
 
     if (success) {
       _scrollAnimationController?.repeat();
       _state = _state.listening();
       notifyListeners();
+    }
+  }
+
+  void _onRawAudioData(Float32List data) {
+    if (_isCalibrating && _selectedPianoKey != null) {
+      // Use currently detected pitch if it's stable and within 2 semitones
+      // of the target theoretical frequency. This ensures we can calibrate
+      // an out-of-tune piano.
+      double expectedF1 = _selectedPianoKey!.frequency;
+      if (_state.currentPitch > 0) {
+        final double semitonesDiff =
+            12 * (log(_state.currentPitch / expectedF1) / log(2));
+        if (semitonesDiff.abs() < 2.0) {
+          expectedF1 = _state.currentPitch;
+        }
+      }
+
+      final b = _audioService.detectInharmonicity(data, expectedF1);
+      if (b > 0) {
+        _lastDetectedB = b;
+        notifyListeners();
+      }
     }
   }
 
@@ -205,7 +245,7 @@ class TunerController extends ChangeNotifier {
 
     // Piano Target Logic
     if (_tuningMode == TuningMode.piano && _selectedPianoKey != null) {
-      double targetFreq = _selectedPianoKey!.frequency;
+      double targetFreq = _selectedPianoKey!.targetFrequency;
       double rawCents = 1200 * (log(freq / targetFreq) / log(2));
       cents = rawCents.clamp(-100.0, 100.0);
       if (rawCents.abs() <= 200) {
@@ -295,12 +335,90 @@ class TunerController extends ChangeNotifier {
   void selectPianoKey(PianoKey? key) {
     _selectedPianoKey = key;
     _trailPositions.clear();
+    _lastDetectedB = -1.0;
+
     if (key != null) {
       _audioService.setFrequencyRange(key.frequency * 0.7, key.frequency * 1.5);
       if (!_audioService.isRecording && _audioService.isInitialized) {
         startCapture();
       }
     }
+    notifyListeners();
+  }
+
+  /// Start piano calibration mode
+  void startCalibration() {
+    _isCalibrating = true;
+    _calibrationMeasurements.clear();
+    _lastDetectedB = -1.0;
+    if (_audioService.isRecording) {
+      // Re-start capture to update onRawData callback
+      stopCapture().then((_) => startCapture());
+    } else if (_audioService.isInitialized) {
+      startCapture();
+    }
+    notifyListeners();
+  }
+
+  /// Stop piano calibration mode
+  void stopCalibration() {
+    _isCalibrating = false;
+    _calibrationMeasurements.clear();
+    _lastDetectedB = -1.0;
+    if (_audioService.isRecording) {
+      stopCapture().then((_) => startCapture()); // Re-start without raw data
+    }
+    notifyListeners();
+  }
+
+  /// Record measurement for currently selected piano key
+  void captureCalibrationMeasurement() {
+    if (_selectedPianoKey != null && _lastDetectedB > 0) {
+      _calibrationMeasurements[_selectedPianoKey!.keyNumber] = _lastDetectedB;
+      notifyListeners();
+    }
+  }
+
+  /// Finalize calibration and create a profile
+  Future<void> finalizeCalibration(String name, PianoType pianoType) async {
+    if (_calibrationMeasurements.isEmpty) return;
+
+    final profile = PianoTuningProfile(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: name,
+      measurements: Map.from(_calibrationMeasurements),
+      createdAt: DateTime.now(),
+      pianoType: pianoType,
+    );
+
+    await applyPianoProfile(profile);
+    _isCalibrating = false;
+    await _saveState();
+    notifyListeners();
+  }
+
+  /// Apply a tuning profile
+  Future<void> applyPianoProfile(PianoTuningProfile profile) async {
+    _pianoProfile = profile;
+
+    final stretchedFreqs = StretchCalculator.calculateStretchedFrequencies(
+      profile,
+      TuningSettings.a4Reference,
+    );
+
+    _stretchedPianoKeys = pianoKeys.map((key) {
+      return key.copyWith(
+        stretchedFrequency: stretchedFreqs[key.keyNumber],
+      );
+    }).toList();
+
+    // Update current selected key to the stretched version
+    if (_selectedPianoKey != null) {
+      _selectedPianoKey = _stretchedPianoKeys.firstWhere(
+        (k) => k.keyNumber == _selectedPianoKey!.keyNumber,
+      );
+    }
+
     notifyListeners();
   }
 

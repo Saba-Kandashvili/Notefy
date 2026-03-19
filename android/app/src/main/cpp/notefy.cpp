@@ -16,6 +16,10 @@
 #include <string.h>
 #include <mutex>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846f
+#endif
+
 // ============================================================================
 // YIN Algorithm Configuration
 // ============================================================================
@@ -596,6 +600,115 @@ extern "C"
 
         g_lastValidPitch = pitchHz;
         return pitchHz;
+    }
+
+    // ========================================================================
+    // NEW: Inharmonicity Detection for Piano Tuning
+    // ========================================================================
+
+    static float calculate_dft_magnitude_windowed(const float *buffer, int length, float freq, int sampleRate)
+    {
+        float real = 0.0f;
+        float imag = 0.0f;
+        float angleStep = 2.0f * M_PI * freq / (float)sampleRate;
+
+        for (int i = 0; i < length; i++)
+        {
+            // Hann window: 0.5 * (1 - cos(2*pi*i/(N-1)))
+            float window = 0.5f * (1.0f - cosf(2.0f * M_PI * (float)i / (float)(length - 1)));
+            float angle = angleStep * (float)i;
+            real += buffer[i] * window * cosf(angle);
+            imag += buffer[i] * window * sinf(angle);
+        }
+
+        return sqrtf(real * real + imag * imag);
+    }
+
+    static float find_peak_in_range(const float *buffer, int length, int sampleRate, float minFreq, float maxFreq, float *outMag)
+    {
+        float bestFreq = minFreq;
+        float maxMag = -1.0f;
+
+        // Scan in 40 steps
+        const int steps = 40;
+        float stepSize = (maxFreq - minFreq) / (float)steps;
+
+        for (int i = 0; i <= steps; i++)
+        {
+            float f = minFreq + stepSize * (float)i;
+            float mag = calculate_dft_magnitude_windowed(buffer, length, f, sampleRate);
+            if (mag > maxMag)
+            {
+                maxMag = mag;
+                bestFreq = f;
+            }
+        }
+
+        // Fine scan around the best frequency
+        float fineMin = bestFreq - stepSize;
+        float fineMax = bestFreq + stepSize;
+        const int fineSteps = 40;
+        float fineStepSize = (fineMax - fineMin) / (float)fineSteps;
+
+        for (int i = 0; i <= fineSteps; i++)
+        {
+            float f = fineMin + fineStepSize * (float)i;
+            float mag = calculate_dft_magnitude_windowed(buffer, length, f, sampleRate);
+            if (mag > maxMag)
+            {
+                maxMag = mag;
+                bestFreq = f;
+            }
+        }
+
+        if (outMag)
+            *outMag = maxMag;
+        return bestFreq;
+    }
+
+    __attribute__((visibility("default"))) __attribute__((used)) float detect_inharmonicity(float *audioData, int length, int sampleRate, float expectedF1)
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        if (audioData == nullptr || length < 512)
+            return -1.0f;
+
+        // Calculate signal energy
+        float rms = calculate_rms(audioData, length);
+        if (rms < g_noiseThreshold)
+        {
+            return -1.0f;
+        }
+
+        float mag1 = 0, mag2 = 0;
+        // 1. Find actual f1 around expectedF1
+        float f1 = find_peak_in_range(audioData, length, sampleRate, expectedF1 * 0.94f, expectedF1 * 1.06f, &mag1);
+
+        // 2. Find f2 around 2*f1
+        float f2 = find_peak_in_range(audioData, length, sampleRate, f1 * 1.95f, f1 * 2.15f, &mag2);
+
+        // Validation: mag should be significantly above noise floor
+        // and f2 should have reasonable energy compared to f1
+        if (mag1 < g_noiseThreshold * length * 0.1f || mag2 < g_noiseThreshold * length * 0.05f)
+        {
+            return -1.0f;
+        }
+
+        // 3. Calculate B
+        float ratio = f2 / (2.0f * f1);
+        float R = ratio * ratio;
+
+        if (R >= 4.0f || R < 1.0f)
+            return 0.0f;
+
+        float b = (R - 1.0f) / (4.0f - R);
+
+        // Limit B to reasonable piano ranges (0.0 to 0.01)
+        if (b < 0.0f)
+            b = 0.0f;
+        if (b > 0.01f)
+            b = 0.01f;
+
+        return b;
     }
 
     // ========================================================================

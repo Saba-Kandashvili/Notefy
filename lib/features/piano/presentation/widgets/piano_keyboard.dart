@@ -6,6 +6,7 @@ import '../../domain/piano_key.dart';
 /// Scrollable piano keyboard widget
 class PianoKeyboard extends StatelessWidget {
   final PianoKey? selectedKey;
+  final List<PianoKey> keys;
   final double cents;
   final bool isRecording;
   final void Function(PianoKey key) onKeySelected;
@@ -19,6 +20,7 @@ class PianoKeyboard extends StatelessWidget {
   const PianoKeyboard({
     super.key,
     required this.selectedKey,
+    required this.keys,
     required this.cents,
     required this.isRecording,
     required this.onKeySelected,
@@ -27,8 +29,8 @@ class PianoKeyboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final whiteKeys = pianoKeys.where((k) => !k.isBlack).toList();
-    final blackKeys = pianoKeys.where((k) => k.isBlack).toList();
+    final whiteKeys = keys.where((k) => !k.isBlack).toList();
+    final blackKeys = keys.where((k) => k.isBlack).toList();
 
     return Container(
       height: whiteKeyHeight + 20,
@@ -62,7 +64,7 @@ class PianoKeyboard extends StatelessWidget {
                 final whiteIdx =
                     PianoKeyGenerator.getWhiteKeyIndexBeforeBlackKey(
                       key,
-                      pianoKeys,
+                      keys,
                     );
                 final left =
                     (whiteIdx + 1) * whiteKeyWidth - (blackKeyWidth / 2) - 1;

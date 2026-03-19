@@ -9,16 +9,31 @@ class PianoKey {
   final double frequency;
   final int keyNumber;
   final bool isBlack;
+  final double? stretchedFrequency;
 
   const PianoKey(
     this.name,
     this.octave,
     this.frequency,
     this.keyNumber,
-    this.isBlack,
-  );
+    this.isBlack, {
+    this.stretchedFrequency,
+  });
 
   String get fullName => "$name$octave";
+
+  double get targetFrequency => stretchedFrequency ?? frequency;
+
+  PianoKey copyWith({double? stretchedFrequency}) {
+    return PianoKey(
+      name,
+      octave,
+      frequency,
+      keyNumber,
+      isBlack,
+      stretchedFrequency: stretchedFrequency ?? this.stretchedFrequency,
+    );
+  }
 }
 
 /// Generates all 88 piano keys with their frequencies
@@ -94,9 +109,9 @@ class PianoKeyGenerator {
   /// Get the index of the white key before a given black key
   static int getWhiteKeyIndexBeforeBlackKey(
     PianoKey blackKey,
-    List<PianoKey> allKeys,
+    List<PianoKey> keys,
   ) {
-    final whiteKeys = allKeys.where((k) => !k.isBlack).toList();
+    final whiteKeys = keys.where((k) => !k.isBlack).toList();
     for (int i = 0; i < whiteKeys.length; i++) {
       final wk = whiteKeys[i];
       if (wk.octave == blackKey.octave) {

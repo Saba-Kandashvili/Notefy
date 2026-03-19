@@ -52,6 +52,12 @@ typedef DartResetFrequencyRange = void Function();
 typedef NativeIsGateOpen = ffi.Bool Function();
 typedef DartIsGateOpen = bool Function();
 
+// Inharmonicity detection (Piano tuning)
+typedef NativeDetectInharmonicity =
+    ffi.Float Function(ffi.Pointer<ffi.Float>, ffi.Int32, ffi.Int32, ffi.Float);
+typedef DartDetectInharmonicity =
+    double Function(ffi.Pointer<ffi.Float>, int, int, double);
+
 // ============================================================================
 // Tuning Mode Constants (must match C++ definitions)
 // ============================================================================
@@ -97,6 +103,7 @@ class AudioEngine {
   DartSetFrequencyRange? _setFrequencyRange;
   DartResetFrequencyRange? _resetFrequencyRange;
   DartIsGateOpen? _isGateOpen;
+  DartDetectInharmonicity? _detectInharmonicity;
 
   // Reusable buffer for audio data (avoids allocation every frame)
   ffi.Pointer<ffi.Float>? _audioBuffer;
@@ -202,6 +209,16 @@ class AudioEngine {
           .asFunction();
     } catch (e) {
       _isGateOpen = null;
+    }
+
+    try {
+      _detectInharmonicity = _lib
+          .lookup<ffi.NativeFunction<NativeDetectInharmonicity>>(
+            'detect_inharmonicity',
+          )
+          .asFunction();
+    } catch (e) {
+      _detectInharmonicity = null;
     }
 
     // Pre-allocate confidence pointer
@@ -318,6 +335,16 @@ class AudioEngine {
     );
 
     return PitchResult(frequency, _confidencePtr![0]);
+  }
+
+  /// Detect inharmonicity coefficient B for a given expected fundamental frequency
+  double detectInharmonicity(Float32List audioData, double expectedF1) {
+    if (audioData.isEmpty || _detectInharmonicity == null) return -1.0;
+
+    _ensureBufferSize(audioData.length);
+    _audioBuffer!.asTypedList(audioData.length).setAll(0, audioData);
+
+    return _detectInharmonicity!(_audioBuffer!, audioData.length, sampleRate, expectedF1);
   }
 
   void _ensureBufferSize(int requiredSize) {

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/models/tuning_model.dart';
+import '../../piano/domain/piano_tuning_profile.dart';
 import '../domain/tuning_mode.dart';
 
 /// Repository for persisting tuner state
@@ -11,6 +12,7 @@ class TunerRepository {
   static const _keyTuningMode = 'tuning_mode';
   static const _keyGuitarPreset = 'guitar_preset';
   static const _keyCustomPresets = 'custom_presets_list';
+  static const _keyPianoProfile = 'piano_tuning_profile';
 
   SharedPreferences? _prefs;
 
@@ -103,6 +105,34 @@ class TunerRepository {
       debugPrint('TunerRepository: Failed to load custom presets: $e');
     }
     return [];
+  }
+
+  /// Save piano tuning profile
+  Future<bool> savePianoProfile(PianoTuningProfile profile) async {
+    try {
+      final prefs = await _preferences;
+      return await prefs.setString(
+        _keyPianoProfile,
+        jsonEncode(profile.toJson()),
+      );
+    } catch (e) {
+      debugPrint('TunerRepository: Failed to save piano profile: $e');
+      return false;
+    }
+  }
+
+  /// Load piano tuning profile
+  Future<PianoTuningProfile?> loadPianoProfile() async {
+    try {
+      final prefs = await _preferences;
+      final json = prefs.getString(_keyPianoProfile);
+      if (json != null && json.isNotEmpty) {
+        return PianoTuningProfile.fromJson(jsonDecode(json));
+      }
+    } catch (e) {
+      debugPrint('TunerRepository: Failed to load piano profile: $e');
+    }
+    return null;
   }
 
   /// Clear all saved data (for debugging/reset)
