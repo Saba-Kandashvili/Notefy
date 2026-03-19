@@ -71,7 +71,7 @@ class AppDrawer extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.primaryAccent.withOpacity(0.2),
+              color: AppColors.primaryAccent.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
@@ -93,10 +93,10 @@ class AppDrawer extends StatelessWidget {
             margin: const EdgeInsets.only(top: 4),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: AppColors.warningAccent.withOpacity(0.2),
+              color: AppColors.warningAccent.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(4),
               border: Border.all(
-                color: AppColors.warningAccent.withOpacity(0.5),
+                color: AppColors.warningAccent.withValues(alpha: 0.5),
               ),
             ),
             child: const Text(
@@ -136,7 +136,7 @@ class AppDrawer extends StatelessWidget {
         style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
       ),
       selected: isSelected,
-      selectedTileColor: AppColors.primaryAccent.withOpacity(0.1),
+      selectedTileColor: AppColors.primaryAccent.withValues(alpha: 0.1),
       onTap: () => onModeSelected(mode),
     );
   }

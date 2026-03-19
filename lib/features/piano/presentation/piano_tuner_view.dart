@@ -4,7 +4,6 @@ import '../../../core/widgets/record_button.dart';
 import '../../../core/widgets/seismograph_widget.dart';
 import '../../../core/widgets/tuning_status_bar.dart';
 import '../../tuner/presentation/tuner_controller.dart';
-import '../domain/piano_key.dart';
 import 'piano_calibration_screen.dart';
 import 'widgets/piano_keyboard.dart';
 

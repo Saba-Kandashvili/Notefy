@@ -12,7 +12,7 @@ class RecordButton extends StatelessWidget {
     super.key,
     required this.isRecording,
     required this.onPressed,
-    this.size = 70.0,
+    this.size = 64.0,
   });
 
   @override
@@ -29,7 +29,7 @@ class RecordButton extends StatelessWidget {
           color: color,
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.4),
+              color: color.withValues(alpha: 0.4),
               blurRadius: 16,
               spreadRadius: 4,
             ),

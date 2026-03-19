@@ -121,6 +121,16 @@ class TunerController extends ChangeNotifier {
     if (savedProfile != null) {
       await applyPianoProfile(savedProfile);
     }
+
+    _selectDefaultTargetForMode();
+  }
+
+  void _selectDefaultTargetForMode() {
+    if (_tuningMode == TuningMode.guitar && _currentPreset.strings.isNotEmpty) {
+      _targetString = _currentPreset.strings.first;
+    } else {
+      _targetString = null;
+    }
   }
 
   Future<void> _saveState() async {
@@ -298,7 +308,7 @@ class TunerController extends ChangeNotifier {
   /// Set tuning mode
   Future<void> setTuningMode(TuningMode mode) async {
     _tuningMode = mode;
-    _targetString = null;
+    _selectDefaultTargetForMode();
     _selectedPianoKey = null;
     _trailPositions.clear();
 
@@ -425,7 +435,7 @@ class TunerController extends ChangeNotifier {
   /// Set current preset
   void setPreset(TuningPreset preset) {
     _currentPreset = preset;
-    _targetString = null;
+    _selectDefaultTargetForMode();
     _trailPositions.clear();
     _saveState();
     notifyListeners();
@@ -446,7 +456,7 @@ class TunerController extends ChangeNotifier {
       _customPresets[index] = preset;
     }
     _currentPreset = preset;
-    _targetString = null;
+    _selectDefaultTargetForMode();
     _trailPositions.clear();
     _saveState();
     notifyListeners();

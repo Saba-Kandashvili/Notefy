@@ -74,43 +74,49 @@ class _TuningEditorState extends State<TuningEditor> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) => Container(
           decoration: const BoxDecoration(
-            color: Color(0xFF1E1E2E),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            color: AppColors.scaffoldBackground,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
           ),
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Handle bar
               Container(
                 width: 40,
-                height: 4,
+                height: 5,
                 decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(2.5),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
               Text(
-                "Edit String ${index + 1}",
+                "EDIT STRING ${index + 1}",
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
                 ),
               ),
               const SizedBox(height: 24),
 
               // Note selector
               const Text(
-                "Note",
-                style: TextStyle(color: Colors.white54, fontSize: 14),
+                "SELECT NOTE",
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.0,
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 10,
+                runSpacing: 10,
                 alignment: WrapAlignment.center,
                 children: NOTE_NAMES.map((note) {
                   final isSelected = selectedNote == note;
@@ -120,27 +126,37 @@ class _TuningEditorState extends State<TuningEditor> {
                       setModalState(() => selectedNote = note);
                     },
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 48,
-                      height: 48,
+                      duration: const Duration(milliseconds: 200),
+                      width: 52,
+                      height: 52,
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.primaryAccent
-                            : Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
+                            : AppColors.surfaceColor,
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isSelected
                               ? AppColors.primaryAccent
-                              : Colors.white.withValues(alpha: 0.15),
+                              : Colors.white.withValues(alpha: 0.1),
+                          width: 1.5,
                         ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: AppColors.primaryAccent.withValues(alpha: 0.3),
+                                  blurRadius: 12,
+                                  spreadRadius: 2,
+                                )
+                              ]
+                            : [],
                       ),
                       child: Center(
                         child: Text(
                           note,
                           style: TextStyle(
                             color: isSelected ? Colors.black : Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
                           ),
                         ),
                       ),
@@ -149,16 +165,22 @@ class _TuningEditorState extends State<TuningEditor> {
                 }).toList(),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
               // Octave selector
               const Text(
-                "Octave",
-                style: TextStyle(color: Colors.white54, fontSize: 14),
+                "SELECT OCTAVE",
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.0,
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(9, (i) {
@@ -169,22 +191,29 @@ class _TuningEditorState extends State<TuningEditor> {
                         setModalState(() => selectedOctave = i);
                       },
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        width: 36,
-                        height: 36,
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        duration: const Duration(milliseconds: 200),
+                        width: 44,
+                        height: 44,
+                        margin: const EdgeInsets.symmetric(horizontal: 6),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? AppColors.inTuneColor
-                              : Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
+                              : AppColors.surfaceColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.inTuneColor
+                                : Colors.white.withValues(alpha: 0.1),
+                            width: 1.5,
+                          ),
                         ),
                         child: Center(
                           child: Text(
                             "$i",
                             style: TextStyle(
                               color: isSelected ? Colors.black : Colors.white,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
                             ),
                           ),
                         ),
@@ -194,40 +223,57 @@ class _TuningEditorState extends State<TuningEditor> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 32),
 
               // Preview
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.surfaceColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                 ),
                 child: Column(
                   children: [
-                    Text(
-                      "$selectedNote$selectedOctave",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          selectedNote,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 42,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -2,
+                          ),
+                        ),
+                        Text(
+                          selectedOctave.toString(),
+                          style: const TextStyle(
+                            color: AppColors.primaryAccent,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
                       "${NoteUtils.getFrequency(selectedNote, selectedOctave).toStringAsFixed(2)} Hz",
                       style: TextStyle(
-                        color: AppColors.primaryAccent,
+                        color: Colors.white.withValues(alpha: 0.4),
                         fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 1.0,
                       ),
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
               // Confirm button
               SizedBox(
@@ -244,14 +290,20 @@ class _TuningEditorState extends State<TuningEditor> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryAccent,
                     foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    elevation: 8,
+                    shadowColor: AppColors.primaryAccent.withValues(alpha: 0.4),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   child: const Text(
-                    "Apply",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    "APPLY CHANGES",
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      letterSpacing: 1.2,
+                    ),
                   ),
                 ),
               ),
@@ -270,9 +322,10 @@ class _TuningEditorState extends State<TuningEditor> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF2D2D44),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
           "Discard Changes?",
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         content: const Text(
           "You have unsaved changes. Do you want to discard them?",
@@ -281,13 +334,13 @@ class _TuningEditorState extends State<TuningEditor> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("Cancel"),
+            child: const Text("CANCEL"),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text(
-              "Discard",
-              style: TextStyle(color: Colors.redAccent),
+              "DISCARD",
+              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -309,12 +362,19 @@ class _TuningEditorState extends State<TuningEditor> {
         }
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF1A1A2E),
+        backgroundColor: AppColors.scaffoldBackground,
         appBar: AppBar(
-          title: const Text("Edit Tuning"),
+          title: const Text(
+            "TUNING EDITOR",
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
+              fontSize: 16,
+            ),
+          ),
           backgroundColor: Colors.transparent,
           leading: IconButton(
-            icon: const Icon(Icons.close),
+            icon: const Icon(Icons.close_rounded),
             onPressed: () async {
               if (_hasChanges) {
                 final shouldPop = await _onWillPop();
@@ -325,18 +385,24 @@ class _TuningEditorState extends State<TuningEditor> {
             },
           ),
           actions: [
-            TextButton.icon(
-              icon: const Icon(Icons.check, color: Colors.greenAccent),
-              label: const Text(
-                "Save",
-                style: TextStyle(color: Colors.greenAccent),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                icon: const Icon(Icons.check_circle_rounded, color: AppColors.primaryAccent),
+                label: const Text(
+                  "SAVE",
+                  style: TextStyle(
+                    color: AppColors.primaryAccent,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                onPressed: () {
+                  _editingPreset.name = _nameController.text.trim().isEmpty
+                      ? "Custom Tuning"
+                      : _nameController.text.trim();
+                  Navigator.pop(context, _editingPreset);
+                },
               ),
-              onPressed: () {
-                _editingPreset.name = _nameController.text.trim().isEmpty
-                    ? "Custom Tuning"
-                    : _nameController.text.trim();
-                Navigator.pop(context, _editingPreset);
-              },
             ),
           ],
         ),
@@ -349,49 +415,67 @@ class _TuningEditorState extends State<TuningEditor> {
                 controller: _nameController,
                 decoration: InputDecoration(
                   labelText: "Preset Name",
-                  labelStyle: const TextStyle(color: Colors.white54),
+                  labelStyle: const TextStyle(color: Colors.white54, fontWeight: FontWeight.bold),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.05),
+                  fillColor: AppColors.surfaceColor,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.primaryAccent, width: 1.5),
+                  ),
                   prefixIcon: const Icon(
-                    Icons.music_note,
-                    color: Colors.white54,
+                    Icons.drive_file_rename_outline_rounded,
+                    color: AppColors.primaryAccent,
                   ),
                 ),
-                style: const TextStyle(color: Colors.white, fontSize: 18),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
                 onChanged: (_) => _markChanged(),
               ),
             ),
 
             // String count indicator
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
                 children: [
-                  Text(
-                    "${_editingPreset.strings.length} Strings",
-                    style: TextStyle(
-                      color: AppColors.primaryAccent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryAccent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      "${_editingPreset.strings.length} STRINGS",
+                      style: const TextStyle(
+                        color: AppColors.primaryAccent,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                   const Spacer(),
                   Text(
-                    "Drag to reorder • Swipe to delete",
+                    "Hold & Drag to reorder",
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.3),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
             // String list with reorder support
             Expanded(
@@ -413,12 +497,13 @@ class _TuningEditorState extends State<TuningEditor> {
                     builder: (context, child) {
                       final elevation = Tween<double>(
                         begin: 0,
-                        end: 8,
+                        end: 12,
                       ).animate(animation).value;
                       return Material(
                         elevation: elevation,
                         color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(16),
+                        shadowColor: AppColors.primaryAccent.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
                         child: child,
                       );
                     },
@@ -436,13 +521,14 @@ class _TuningEditorState extends State<TuningEditor> {
                         : DismissDirection.none,
                     background: Container(
                       alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 20),
-                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.only(right: 24),
+                      margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.redAccent.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
                       ),
-                      child: const Icon(Icons.delete, color: Colors.redAccent),
+                      child: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 32),
                     ),
                     onDismissed: (_) => _removeString(index),
                     child: _StringCard(
@@ -460,21 +546,26 @@ class _TuningEditorState extends State<TuningEditor> {
             // Add string button
             SafeArea(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
                 child: SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: _addString,
-                    icon: const Icon(Icons.add),
-                    label: const Text("Add Lower String"),
+                    icon: const Icon(Icons.add_circle_outline_rounded),
+                    label: const Text("ADD LOWER STRING"),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primaryAccent,
                       side: BorderSide(
-                        color: AppColors.primaryAccent.withValues(alpha: 0.5),
+                        color: AppColors.primaryAccent.withValues(alpha: 0.4),
+                        width: 1.5,
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 18),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      textStyle: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
                       ),
                     ),
                   ),
@@ -504,56 +595,55 @@ class _StringCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // String thickness visualization (thicker for bass strings)
-    final thickness = 4.0 + (totalStrings - 1 - index) * 0.8;
-    final progress = totalStrings > 1 ? index / (totalStrings - 1) : 0.5;
-
-    // Color: bass = bronze, treble = silver
-    final stringColor = progress < 0.5
-        ? Color.lerp(
-            const Color(0xFFCD853F),
-            const Color(0xFFB8860B),
-            progress * 2,
-          )!
-        : Color.lerp(
-            const Color(0xFFB8860B),
-            const Color(0xFFC0C0C0),
-            (progress - 0.5) * 2,
-          )!;
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
+        margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          color: AppColors.surfaceColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.05),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            // String number with visual thickness
+            // Modern index indicator
             Container(
-              width: 44,
-              height: 44,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: stringColor.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primaryAccent.withValues(alpha: 0.2),
+                    AppColors.primaryAccent.withValues(alpha: 0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppColors.primaryAccent.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
               ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // String line visualization
-                  Container(
-                    width: thickness,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: stringColor,
-                      borderRadius: BorderRadius.circular(thickness / 2),
-                    ),
+              child: Center(
+                child: Text(
+                  "${index + 1}",
+                  style: const TextStyle(
+                    color: AppColors.primaryAccent,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
                   ),
-                ],
+                ),
               ),
             ),
             const SizedBox(width: 16),
@@ -563,47 +653,56 @@ class _StringCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "${string.note}${string.octave}",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        string.note,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 26,
+                          letterSpacing: -1,
+                        ),
+                      ),
+                      Text(
+                        string.octave.toString(),
+                        style: TextStyle(
+                          color: AppColors.primaryAccent.withValues(alpha: 0.7),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
                   ),
                   Text(
                     "${string.frequency.toStringAsFixed(2)} Hz",
                     style: TextStyle(
-                      color: AppColors.primaryAccent.withValues(alpha: 0.8),
-                      fontSize: 14,
+                      color: Colors.white.withValues(alpha: 0.4),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
               ),
             ),
 
-            // String number badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                "String ${index + 1}",
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 12,
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 8),
+            // Drag handle
             ReorderableDragStartListener(
               index: index,
-              child: Icon(
-                Icons.drag_handle,
-                color: Colors.white.withValues(alpha: 0.4),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.drag_indicator_rounded,
+                  color: Colors.white.withValues(alpha: 0.2),
+                  size: 28,
+                ),
               ),
             ),
           ],

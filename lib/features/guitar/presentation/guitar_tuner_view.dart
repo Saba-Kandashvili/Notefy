@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:notefy/features/guitar/presentation/tuning_editor.dart';
-import 'package:notefy/features/guitar/presentation/widgets/dynamic_headstock.dart';
+import 'package:notefy/features/guitar/presentation/widgets/modern_headstock.dart';
 
 import '../../../core/models/tuning_model.dart';
 import '../../../core/theme/app_theme.dart';
@@ -42,9 +43,90 @@ class GuitarTunerView extends StatelessWidget {
   }
 
   void _createNewPreset(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    final TextEditingController nameController = TextEditingController(
+      text: "Custom Tuning ${controller.customPresets.length + 1}",
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF2D2D44),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text(
+          "CREATE PRESET",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.2,
+            fontSize: 16,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Give your custom tuning a name to get started.",
+              style: TextStyle(color: Colors.white54, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: nameController,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: AppColors.surfaceColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primaryAccent, width: 1.5),
+                ),
+                prefixIcon: const Icon(Icons.edit_note_rounded, color: AppColors.primaryAccent),
+              ),
+              onSubmitted: (_) {
+                final name = nameController.text.trim();
+                if (name.isNotEmpty) {
+                  Navigator.pop(ctx);
+                  _finalizeCreatePreset(context, name);
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("CANCEL"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.pop(ctx);
+                _finalizeCreatePreset(context, name);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryAccent,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              textStyle: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            child: const Text("CREATE"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _finalizeCreatePreset(BuildContext context, String name) {
     final newPreset = TuningPreset.standard6String();
     newPreset.id = DateTime.now().millisecondsSinceEpoch.toString();
-    newPreset.name = "Custom Tuning ${controller.customPresets.length + 1}";
+    newPreset.name = name;
 
     controller.addCustomPreset(newPreset);
     _openEditor(context);
@@ -59,7 +141,7 @@ class GuitarTunerView extends StatelessWidget {
       children: [
         // Header with edit and preset selector
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -76,7 +158,7 @@ class GuitarTunerView extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
-                    vertical: 8,
+                    vertical: 4,
                   ),
                   child: Row(
                     children: [
@@ -102,28 +184,46 @@ class GuitarTunerView extends StatelessWidget {
           ),
         ),
 
-        // String selector - compact horizontal bar
+        // String selector - scrollable modern design
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: DynamicHeadstock(
+          child: ModernHeadstock(
             preset: controller.currentPreset,
             selectedString: targetString,
             onStringSelected: (str) => controller.selectString(str),
+            currentCents: state.cents,
+            isRecording: state.isRecording,
           ),
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 4),
 
-        // Target string info
+        // Target string info - prominent note name and tiny frequency
         if (targetString != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              "Target: ${targetString.name} (${targetString.frequency.toStringAsFixed(1)} Hz)",
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 16,
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  targetString.name,
+                  style: const TextStyle(
+                    color: AppColors.primaryAccent,
+                    fontSize: 36,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1.5,
+                  ),
+                ),
+                Text(
+                  "${targetString.frequency.toStringAsFixed(1)} Hz",
+                  style: TextStyle(
+                    color: AppColors.textSecondary.withValues(alpha: 0.5),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
             ),
           )
         else
@@ -131,7 +231,11 @@ class GuitarTunerView extends StatelessWidget {
             padding: EdgeInsets.only(bottom: 8),
             child: Text(
               "Select a string to tune",
-              style: TextStyle(color: AppColors.textDisabled, fontSize: 14),
+              style: TextStyle(
+                color: AppColors.textDisabled,
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ),
 
@@ -158,7 +262,7 @@ class GuitarTunerView extends StatelessWidget {
           isInStandby: controller.isInStandby,
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
 
         // Record button
         RecordButton(
@@ -172,7 +276,7 @@ class GuitarTunerView extends StatelessWidget {
           },
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
       ],
     );
   }

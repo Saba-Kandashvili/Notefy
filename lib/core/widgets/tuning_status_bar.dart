@@ -43,10 +43,10 @@ class TuningStatusBar extends StatelessWidget {
         : cents.toStringAsFixed(1);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -56,13 +56,14 @@ class TuningStatusBar extends StatelessWidget {
             value: isActive ? centsText : "--",
             label: "cents",
             color: color,
+            fontSize: 20,
           ),
-          Container(width: 1, height: 40, color: Colors.white12),
+          Container(width: 1, height: 32, color: Colors.white12),
           _buildColumn(
             value: status.isEmpty || isInStandby ? "--" : status,
             label: "status",
             color: color,
-            fontSize: 20,
+            fontSize: 18,
           ),
         ],
       ),

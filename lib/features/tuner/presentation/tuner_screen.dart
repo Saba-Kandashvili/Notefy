@@ -110,20 +110,34 @@ class _TunerScreenState extends State<TunerScreen>
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text("Heads up — Piano tuner (Experimental)"),
+        backgroundColor: const Color(0xFF2D2D44),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "Heads up — Piano tuner (Experimental)",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         content: const Text(
           "The piano tuner is currently under development and may produce inaccurate results. "
           "If you proceed, please double-check your tuning by ear or with a trusted reference. "
           "Press 'Acknowledge' to continue, or 'Cancel' to return to your previous tuner.",
+          style: TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text("Cancel"),
+            child: const Text("CANCEL"),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text("Acknowledge"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryAccent,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              textStyle: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            child: const Text("ACKNOWLEDGE"),
           ),
         ],
       ),
