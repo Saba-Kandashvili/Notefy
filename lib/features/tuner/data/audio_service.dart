@@ -7,7 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/services/audio_engine.dart';
 
 /// Callback for when pitch is detected
-typedef PitchCallback = void Function(double pitch);
+typedef PitchCallback = void Function(PitchResult result);
 
 /// Callback for errors
 typedef ErrorCallback = void Function(Object error);
@@ -55,10 +55,11 @@ class AudioService {
           try {
             if (onRawData != null) onRawData(data);
 
-            final pitch = _engine.processAudioFloat32(data);
-            if (pitch > AppConstants.minDetectableFrequency &&
-                pitch < AppConstants.maxDetectableFrequency) {
-              onPitchDetected(pitch);
+            final result = _engine.processAudioFloat32WithConfidence(data);
+            if (result.hasPitch &&
+                result.frequency > AppConstants.minDetectableFrequency &&
+                result.frequency < AppConstants.maxDetectableFrequency) {
+              onPitchDetected(result);
             } else {
               onNoPitch();
             }
