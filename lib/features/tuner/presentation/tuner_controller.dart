@@ -193,13 +193,13 @@ class TunerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _onPitchDetected(double pitch) {
+  void _onPitchDetected(PitchResult result) {
     _standbyTimer?.cancel();
     if (_isInStandby) {
       _isInStandby = false;
       _standbyAnimationController?.reset();
     }
-    _calculateNote(pitch);
+    _calculateNote(result.frequency, result.confidence);
   }
 
   void _onNoPitchDetected() {
@@ -231,7 +231,7 @@ class TunerController extends ChangeNotifier {
     _standbyProgress = 0.0;
   }
 
-  void _calculateNote(double freq) {
+  void _calculateNote(double freq, double confidence) {
     if (freq <= 0) return;
 
     double midi = 12 * (log(freq / TuningSettings.a4Reference) / log(2)) + 69;
@@ -278,6 +278,7 @@ class TunerController extends ChangeNotifier {
 
     _state = _state.copyWith(
       currentPitch: freq,
+      confidence: confidence,
       note: noteName,
       octave: octave,
       cents: cents,

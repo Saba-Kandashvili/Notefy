@@ -3,6 +3,7 @@ import '../../../core/constants/app_constants.dart';
 /// Represents the current state of the tuner
 class TunerState {
   final double currentPitch;
+  final double confidence;
   final String note;
   final int octave;
   final double cents;
@@ -13,6 +14,7 @@ class TunerState {
 
   const TunerState({
     this.currentPitch = 0.0,
+    this.confidence = 0.0,
     this.note = "--",
     this.octave = 0,
     this.cents = 0.0,
@@ -48,6 +50,7 @@ class TunerState {
   /// Create a copy with modified values
   TunerState copyWith({
     double? currentPitch,
+    double? confidence,
     String? note,
     int? octave,
     double? cents,
@@ -58,6 +61,7 @@ class TunerState {
   }) {
     return TunerState(
       currentPitch: currentPitch ?? this.currentPitch,
+      confidence: confidence ?? this.confidence,
       note: note ?? this.note,
       octave: octave ?? this.octave,
       cents: cents ?? this.cents,
@@ -77,9 +81,14 @@ class TunerState {
     status: "Paused",
     note: "--",
     currentPitch: 0.0,
+    confidence: 0.0,
     cents: 0.0,
   );
 
   /// State when listening
-  TunerState listening() => copyWith(isRecording: true, status: "Listening...");
+  TunerState listening() => copyWith(
+    isRecording: true, 
+    status: "Listening...",
+    confidence: 0.0,
+  );
 }

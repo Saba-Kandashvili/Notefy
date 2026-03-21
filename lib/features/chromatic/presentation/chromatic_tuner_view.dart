@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/record_button.dart';
 import '../../../core/widgets/seismograph_widget.dart';
 import '../../../core/widgets/tuning_status_bar.dart';
 import '../../tuner/presentation/tuner_controller.dart';
+import 'widgets/chromatic_note_display.dart';
 
 /// Chromatic tuner view - detects any note
 class ChromaticTunerView extends StatelessWidget {
@@ -12,49 +12,23 @@ class ChromaticTunerView extends StatelessWidget {
 
   const ChromaticTunerView({super.key, required this.controller});
 
-  Color _getTuningColor(double cents) {
-    double absCents = cents.abs();
-    if (absCents < 5) return AppColors.inTuneColor;
-    if (absCents < 15) return AppColors.closeColor;
-    return AppColors.outOfTuneColor;
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = controller.state;
-    final isActive =
-        state.isRecording && state.note != "--" && !controller.isInStandby;
-
-    final detectedNote = isActive ? state.fullNoteName : "--";
 
     return Column(
       children: [
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
 
-        // Large note display
-        Text(
-          detectedNote,
-          style: TextStyle(
-            fontSize: 80,
-            fontWeight: FontWeight.bold,
-            color: isActive
-                ? _getTuningColor(state.cents)
-                : AppColors.textMuted,
-          ),
+        // Modern Note Display with Gauge and Confidence
+        ChromaticNoteDisplay(
+          state: state,
+          isInStandby: controller.isInStandby,
         ),
 
-        // Frequency display
-        if (state.isRecording &&
-            state.currentPitch > 0 &&
-            !controller.isInStandby)
-          Text(
-            "${state.currentPitch.toStringAsFixed(1)} Hz",
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 16),
-          ),
+        const SizedBox(height: 10),
 
-        const SizedBox(height: 20),
-
-        // Seismograph
+        // Seismograph - takes remaining space
         Expanded(
           child: SeismographWidget(
             trailPositions: controller.trailPositions,
@@ -77,7 +51,7 @@ class ChromaticTunerView extends StatelessWidget {
           isInStandby: controller.isInStandby,
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 8),
 
         // Record button
         RecordButton(
@@ -91,7 +65,7 @@ class ChromaticTunerView extends StatelessWidget {
           },
         ),
 
-        const SizedBox(height: 30),
+        const SizedBox(height: 20),
       ],
     );
   }
