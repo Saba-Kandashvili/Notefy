@@ -2,7 +2,8 @@
 enum TuningMode {
   chromatic,
   guitar,
-  piano;
+  piano,
+  practice;
 
   String get displayName {
     switch (this) {
@@ -12,6 +13,8 @@ enum TuningMode {
         return 'Guitar';
       case TuningMode.piano:
         return 'Piano';
+      case TuningMode.practice:
+        return 'Practice';
     }
   }
 
@@ -23,6 +26,8 @@ enum TuningMode {
         return 'Custom tunings & Strings';
       case TuningMode.piano:
         return 'Full range (A0-C8)';
+      case TuningMode.practice:
+        return 'Bends, Chords & More';
     }
   }
 }

@@ -38,6 +38,7 @@ static std::mutex g_mutex;
 #define MODE_CHROMATIC 0
 #define MODE_GUITAR 1
 #define MODE_PIANO 2
+#define MODE_PRACTICE 3
 
 // Frequency ranges - all modes use full range by default
 // Guitar/Piano modes only affect noise gate sensitivity
@@ -53,10 +54,15 @@ static std::mutex g_mutex;
 #define NOISE_GATE_CHROMATIC 0.008f // Medium sensitivity
 #define NOISE_GATE_GUITAR 0.010f    // Guitar - slightly higher for amp noise
 #define NOISE_GATE_PIANO 0.006f     // Piano can be quieter, more sensitive
+#define NOISE_GATE_PRACTICE 0.005f  // Practice - very sensitive to allow quiet bends
 
 // Sustained signal detection - requires multiple frames above threshold
 #define NOISE_GATE_ATTACK_FRAMES 2  // Frames needed to "open" gate
 #define NOISE_GATE_RELEASE_FRAMES 5 // Frames before gate "closes"
+
+// Practice mode (Fast Response, but stable)
+#define NOISE_GATE_ATTACK_FRAMES_PRACTICE 4  // More frames needed to stabilize pick attack
+#define NOISE_GATE_RELEASE_FRAMES_PRACTICE 6 // Slower release to avoid dropouts at end of note
 
 // ============================================================================
 // Pitch Stability Configuration
@@ -102,19 +108,26 @@ extern "C"
         std::lock_guard<std::mutex> lock(g_mutex);
         g_currentMode = mode;
 
-        // Modes only affect noise gate threshold
-        // Frequency range stays wide to support all tunings
+        // Modes only affect noise gate threshold and algorithm sensitivity
         switch (mode)
         {
         case MODE_GUITAR:
             g_noiseThreshold = NOISE_GATE_GUITAR;
+            g_yinThreshold = 0.15f;
             break;
         case MODE_PIANO:
             g_noiseThreshold = NOISE_GATE_PIANO;
+            g_yinThreshold = 0.15f;
+            break;
+        case MODE_PRACTICE:
+            g_noiseThreshold = 0.007f;
+            // Lower threshold = more strict (requires better autocorrelation match)
+            g_yinThreshold = 0.12f;
             break;
         case MODE_CHROMATIC:
         default:
             g_noiseThreshold = NOISE_GATE_CHROMATIC;
+            g_yinThreshold = 0.15f;
             break;
         }
 
@@ -309,13 +322,16 @@ extern "C"
 
         bool signal_present = above_threshold && has_signal;
 
+        int attack_frames = (g_currentMode == MODE_PRACTICE) ? NOISE_GATE_ATTACK_FRAMES_PRACTICE : NOISE_GATE_ATTACK_FRAMES;
+        int release_frames = (g_currentMode == MODE_PRACTICE) ? NOISE_GATE_RELEASE_FRAMES_PRACTICE : NOISE_GATE_RELEASE_FRAMES;
+
         if (signal_present)
         {
             g_gateCloseCounter = 0;
             g_gateOpenCounter++;
 
             // Open gate after sustained signal
-            if (g_gateOpenCounter >= NOISE_GATE_ATTACK_FRAMES)
+            if (g_gateOpenCounter >= attack_frames)
             {
                 g_gateIsOpen = true;
             }
@@ -326,7 +342,7 @@ extern "C"
             g_gateCloseCounter++;
 
             // Close gate after sustained silence
-            if (g_gateCloseCounter >= NOISE_GATE_RELEASE_FRAMES)
+            if (g_gateCloseCounter >= release_frames)
             {
                 g_gateIsOpen = false;
                 reset_pitch_stability(); // Reset pitch history when gate closes
@@ -524,6 +540,9 @@ extern "C"
         float betterTau = yin_parabolic_interpolation(g_yinBuffer, tau, length);
         float pitchHz = (float)sampleRate / betterTau;
 
+        // Apply octave correction
+        pitchHz = correct_octave_error(pitchHz);
+
         // Final frequency range check
         if (pitchHz < g_minFrequency || pitchHz > g_maxFrequency)
         {
@@ -592,6 +611,9 @@ extern "C"
 
         float betterTau = yin_parabolic_interpolation(g_yinBuffer, tau, length);
         float pitchHz = (float)sampleRate / betterTau;
+
+        // Apply octave correction
+        pitchHz = correct_octave_error(pitchHz);
 
         if (pitchHz < g_minFrequency || pitchHz > g_maxFrequency)
         {

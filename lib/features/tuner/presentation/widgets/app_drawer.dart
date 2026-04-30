@@ -35,6 +35,11 @@ class AppDrawer extends StatelessWidget {
             mode: TuningMode.guitar,
           ),
           _buildModeItem(context, icon: Icons.piano, mode: TuningMode.piano),
+          _buildModeItem(
+            context,
+            icon: Icons.fitness_center,
+            mode: TuningMode.practice,
+          ),
           const Divider(color: Colors.white24),
           ListTile(
             leading: const Icon(
