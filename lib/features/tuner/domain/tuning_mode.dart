@@ -10,7 +10,7 @@ enum TuningMode {
       case TuningMode.chromatic:
         return 'Chromatic';
       case TuningMode.guitar:
-        return 'Guitar';
+        return 'Strings';
       case TuningMode.piano:
         return 'Piano';
       case TuningMode.practice:
@@ -23,7 +23,7 @@ enum TuningMode {
       case TuningMode.chromatic:
         return 'Detect any note';
       case TuningMode.guitar:
-        return 'Custom tunings & Strings';
+        return 'Custom string tunings';
       case TuningMode.piano:
         return 'Full range (A0-C8)';
       case TuningMode.practice:
