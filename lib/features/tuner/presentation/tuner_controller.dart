@@ -324,6 +324,9 @@ class TunerController extends ChangeNotifier {
       case TuningMode.chromatic:
         _audioService.setTuningMode(TuningModeNative.chromatic);
         break;
+      case TuningMode.practice:
+        _audioService.setTuningMode(TuningModeNative.practice);
+        break;
     }
 
     await _saveState();
@@ -349,12 +352,22 @@ class TunerController extends ChangeNotifier {
     _lastDetectedB = -1.0;
 
     if (key != null) {
-      _audioService.setFrequencyRange(key.frequency * 0.7, key.frequency * 1.5);
+      setFrequencyRange(key.frequency * 0.7, key.frequency * 1.5);
       if (!_audioService.isRecording && _audioService.isInitialized) {
         startCapture();
       }
     }
     notifyListeners();
+  }
+
+  /// Set frequency range for detection
+  void setFrequencyRange(double minFreq, double maxFreq) {
+    _audioService.setFrequencyRange(minFreq, maxFreq);
+  }
+
+  /// Reset frequency range
+  void resetFrequencyRange() {
+    _audioService.resetFrequencyRange();
   }
 
   /// Start piano calibration mode

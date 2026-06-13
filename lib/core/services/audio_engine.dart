@@ -65,7 +65,8 @@ typedef DartDetectInharmonicity =
 enum TuningModeNative {
   chromatic(0),
   guitar(1),
-  piano(2);
+  piano(2),
+  practice(3);
 
   final int value;
   const TuningModeNative(this.value);

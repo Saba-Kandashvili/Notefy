@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../chromatic/presentation/chromatic_tuner_view.dart';
 import '../../guitar/presentation/guitar_tuner_view.dart';
 import '../../piano/presentation/piano_tuner_view.dart';
+import '../../practice/presentation/practice_view.dart';
 import '../domain/tuning_mode.dart';
 import 'tuner_controller.dart';
 import 'widgets/app_drawer.dart';
@@ -101,6 +102,15 @@ class _TunerScreenState extends State<TunerScreen>
       }
     }
 
+    // Show warning for Practice mode (under construction)
+    if (mode == TuningMode.practice) {
+      final acknowledged = await _showPracticeWarningDialog();
+      if (acknowledged != true) {
+        Navigator.pop(context);
+        return;
+      }
+    }
+
     await _controller.setTuningMode(mode);
     if (mounted) Navigator.pop(context);
   }
@@ -138,6 +148,45 @@ class _TunerScreenState extends State<TunerScreen>
               textStyle: const TextStyle(fontWeight: FontWeight.bold),
             ),
             child: const Text("ACKNOWLEDGE"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _showPracticeWarningDialog() {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2D2D44),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "Heads up — Practice tab (Under Construction)",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          "Practice mode is heavily under construction and experimental right now. "
+          "Some features may not work correctly yet. "
+          "Press 'Continue' to enter anyway, or 'Cancel' to go back.",
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("CANCEL"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warningAccent,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              textStyle: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            child: const Text("CONTINUE"),
           ),
         ],
       ),
@@ -261,6 +310,8 @@ class _TunerScreenState extends State<TunerScreen>
         return GuitarTunerView(controller: _controller);
       case TuningMode.piano:
         return PianoTunerView(controller: _controller);
+      case TuningMode.practice:
+        return PracticeView(controller: _controller);
     }
   }
 }

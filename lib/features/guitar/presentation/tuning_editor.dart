@@ -62,6 +62,37 @@ class _TuningEditorState extends State<TuningEditor> {
     });
   }
 
+  Future<void> _confirmRemoveString(int index) async {
+    if (_editingPreset.strings.length <= 1) return;
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("Remove String", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text("Are you sure you want to remove this string?", style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("CANCEL", style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("REMOVE", style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      _removeString(index);
+    }
+  }
+
   void _showNotePicker(int index) {
     final str = _editingPreset.strings[index];
     String selectedNote = str.note;
@@ -514,30 +545,13 @@ class _TuningEditorState extends State<TuningEditor> {
                   final str = _editingPreset.strings[index];
                   final canDelete = _editingPreset.strings.length > 1;
 
-                  return Dismissible(
-                    key: ValueKey('string_$index'),
-                    direction: canDelete
-                        ? DismissDirection.endToStart
-                        : DismissDirection.none,
-                    background: Container(
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 24),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
-                      ),
-                      child: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 32),
-                    ),
-                    onDismissed: (_) => _removeString(index),
-                    child: _StringCard(
-                      key: ValueKey('card_$index'),
-                      index: index,
-                      string: str,
-                      totalStrings: _editingPreset.strings.length,
-                      onTap: () => _showNotePicker(index),
-                    ),
+                  return _StringCard(
+                    key: ValueKey('card_$index'),
+                    index: index,
+                    string: str,
+                    totalStrings: _editingPreset.strings.length,
+                    onTap: () => _showNotePicker(index),
+                    onDelete: canDelete ? () => _confirmRemoveString(index) : null,
                   );
                 },
               ),
@@ -584,6 +598,7 @@ class _StringCard extends StatelessWidget {
   final InstrumentString string;
   final int totalStrings;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
   const _StringCard({
     super.key,
@@ -591,6 +606,7 @@ class _StringCard extends StatelessWidget {
     required this.string,
     required this.totalStrings,
     required this.onTap,
+    this.onDelete,
   });
 
   @override
@@ -688,6 +704,14 @@ class _StringCard extends StatelessWidget {
                 ],
               ),
             ),
+
+            if (onDelete != null)
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded),
+                color: Colors.redAccent.withValues(alpha: 0.8),
+                onPressed: onDelete,
+                tooltip: "Remove String",
+              ),
 
             // Drag handle
             ReorderableDragStartListener(
