@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/audio_generator.dart';
 import '../../../tuner/presentation/tuner_controller.dart';
 
 enum MatchStatus { waiting, correct, wrong }
@@ -37,11 +38,17 @@ class _FretboardPracticeTabState extends State<FretboardPracticeTab> {
   
   bool _isPlaying = false;
   Timer? _advanceTimer;
+  String? _notesDirPath;
 
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onPitchDetected);
+    _initAudio();
+  }
+
+  Future<void> _initAudio() async {
+    _notesDirPath = await AudioGenerator.ensureNotesGenerated();
   }
 
   @override
@@ -124,8 +131,9 @@ class _FretboardPracticeTabState extends State<FretboardPracticeTab> {
   }
 
   void _playTargetSound() {
+    if (_notesDirPath == null) return;
     String filename = _targetNoteLabel.replaceAll('#', 's');
-    _audioPlayer.play(AssetSource('audio/notes/$filename.wav'));
+    _audioPlayer.play(DeviceFileSource('$_notesDirPath/$filename.wav'));
   }
 
   @override
