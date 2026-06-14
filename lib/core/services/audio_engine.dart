@@ -58,6 +58,12 @@ typedef NativeDetectInharmonicity =
 typedef DartDetectInharmonicity =
     double Function(ffi.Pointer<ffi.Float>, int, int, double);
 
+// Bends practice real-time fast pitch tracking
+typedef NativeDetectPitchBend =
+    ffi.Float Function(ffi.Pointer<ffi.Float>, ffi.Int32, ffi.Int32, ffi.Float);
+typedef DartDetectPitchBend =
+    double Function(ffi.Pointer<ffi.Float>, int, int, double);
+
 // ============================================================================
 // Tuning Mode Constants (must match C++ definitions)
 // ============================================================================
@@ -105,6 +111,7 @@ class AudioEngine {
   DartResetFrequencyRange? _resetFrequencyRange;
   DartIsGateOpen? _isGateOpen;
   DartDetectInharmonicity? _detectInharmonicity;
+  DartDetectPitchBend? _detectPitchBend;
 
   // Reusable buffer for audio data (avoids allocation every frame)
   ffi.Pointer<ffi.Float>? _audioBuffer;
@@ -220,6 +227,16 @@ class AudioEngine {
           .asFunction();
     } catch (e) {
       _detectInharmonicity = null;
+    }
+
+    try {
+      _detectPitchBend = _lib
+          .lookup<ffi.NativeFunction<NativeDetectPitchBend>>(
+            'detect_pitch_bend',
+          )
+          .asFunction();
+    } catch (e) {
+      _detectPitchBend = null;
     }
 
     // Pre-allocate confidence pointer
@@ -346,6 +363,16 @@ class AudioEngine {
     _audioBuffer!.asTypedList(audioData.length).setAll(0, audioData);
 
     return _detectInharmonicity!(_audioBuffer!, audioData.length, sampleRate, expectedF1);
+  }
+
+  /// Fast pitch tracking for practice bends
+  double trackBendPitch(Float32List audioData, double expectedFreq) {
+    if (audioData.isEmpty || _detectPitchBend == null) return -1.0;
+
+    _ensureBufferSize(audioData.length);
+    _audioBuffer!.asTypedList(audioData.length).setAll(0, audioData);
+
+    return _detectPitchBend!(_audioBuffer!, audioData.length, sampleRate, expectedFreq);
   }
 
   void _ensureBufferSize(int requiredSize) {

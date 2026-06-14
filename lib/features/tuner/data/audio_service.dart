@@ -113,6 +113,11 @@ class AudioService {
     _engine.resetFrequencyRange();
   }
 
+  /// Track pitch for bends practice
+  double trackBendPitch(Float32List audioData, double expectedFreq) {
+    return _engine.trackBendPitch(audioData, expectedFreq);
+  }
+
   /// Dispose of resources
   void dispose() {
     if (_isRecording) {

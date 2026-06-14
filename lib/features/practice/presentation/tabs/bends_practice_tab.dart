@@ -1,4 +1,7 @@
 import 'dart:math';
+import 'dart:async';
+
+import 'package:audioplayers/audioplayers.dart';
 
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -23,7 +26,10 @@ class _BendsPracticeTabState extends State<BendsPracticeTab> {
   double? _referenceFrequency;
   DateTime? _startTime;
   bool _isBending = false;
-  final double _durationMs = 2000.0; // 2 seconds total
+  
+  // Duration state
+  int _durationSeconds = 2;
+  double get _durationMs => _durationSeconds * 1000.0;
 
   // Stability check for reference note
   int _stableFrames = 0;
@@ -38,6 +44,14 @@ class _BendsPracticeTabState extends State<BendsPracticeTab> {
 
   // To store the path taken by the user
   List<Offset> _userPath = [];
+
+  // Count-in state
+  int _countInBeats = 4;
+  bool _isMetronomeEnabled = true;
+  bool _isCountingIn = false;
+  int _currentCount = 0;
+  Timer? _countInTimer;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -63,66 +77,41 @@ class _BendsPracticeTabState extends State<BendsPracticeTab> {
 
   @override
   void dispose() {
+    _countInTimer?.cancel();
+    _audioPlayer.dispose();
     widget.controller.removeListener(_onPitchChanged);
-    widget.controller.resetFrequencyRange();
+    widget.controller.stopBendsPractice();
     super.dispose();
   }
 
   void _onPitchChanged() {
-    final state = widget.controller.state;
-    // Increased confidence threshold and checking if it's within our expected range
-    if (state.currentPitch <= 0 || state.confidence < 0.85) { 
-      if (_isBending && _startTime != null) {
-        final elapsed = DateTime.now().difference(_startTime!).inMilliseconds;
-        // Keep session alive for a short dropout, otherwise reset
-        if (elapsed > _durationMs + 500) {
-          _resetSession();
-        }
-      } else {
-        // Reset stability check if signal is lost
-        _stableFrames = 0;
-        setState(() {});
+    if (!_isBending || _startTime == null) return;
+    
+    // Use the fast isolated bend pitch tracker
+    final currentBendPitch = widget.controller.currentBendPitch;
+    
+    if (currentBendPitch <= 0) {
+      // Signal lost momentarily
+      final elapsed = DateTime.now().difference(_startTime!).inMilliseconds;
+      if (elapsed > _durationMs + 500) {
+        _resetSession();
       }
       return;
     }
 
-    // Calculate current cents relative to our SELECTED reference note
     final double refFreq = _selectedReferenceNote.frequency;
-    double rawCents = 1200 * (log(state.currentPitch / refFreq) / log(2));
+    double rawCents = 1200 * (log(currentBendPitch / refFreq) / log(2));
 
-    // Apply EMA smoothing
-    _smoothedCents = _smoothedCents + (rawCents - _smoothedCents) * _smoothingFactor;
+    // Apply EMA smoothing (can be lower now since the new engine is faster)
+    _smoothedCents = _smoothedCents + (rawCents - _smoothedCents) * 0.4;
 
-    if (!_isBending) {
-      // Check if user is playing the starting note stably
-      // Within 25 cents of the target reference note
-      if (rawCents.abs() < 25) {
-        _stableFrames++;
-        if (_stableFrames >= _requiredStableFrames) {
-          _referenceFrequency = state.currentPitch; // Lock in the actual frequency they are playing
-          // We don't reset _smoothedCents to 0 here because we want it to be relative to the THEORETICAL reference
-          // Actually, let's keep it relative to theoretical reference so the 0 line is always the same.
-        }
-      } else {
-        _stableFrames = 0;
-        
-        // If they are bending up from the reference, start session
-        // They must have been stable at the reference note first (captured in _referenceFrequency)
-        if (_referenceFrequency != null && rawCents > 30) {
-           _startBending();
-        }
+    final elapsed = DateTime.now().difference(_startTime!).inMilliseconds;
+    if (elapsed > _durationMs) {
+      if (elapsed > _durationMs + 2000) {
+        _resetSession();
       }
     } else {
-      // Session in progress
-      final elapsed = DateTime.now().difference(_startTime!).inMilliseconds;
-      if (elapsed > _durationMs) {
-        // End of session - keep showing for 2 seconds then auto-reset for repeat
-        if (elapsed > _durationMs + 2000) {
-          _resetSession();
-        }
-      } else {
-        _userPath.add(Offset(elapsed / _durationMs, _smoothedCents));
-      }
+      _userPath.add(Offset(elapsed / _durationMs, _smoothedCents));
     }
 
     _updateZoom();
@@ -159,19 +148,71 @@ class _BendsPracticeTabState extends State<BendsPracticeTab> {
   }
 
   void _startBending() {
-    _isBending = true;
-    _startTime = DateTime.now();
-    _userPath = [Offset(0, _smoothedCents)];
+    if (_countInBeats > 0) {
+      _startCountIn();
+    } else {
+      _startSessionRecording();
+    }
+  }
+
+  void _startCountIn() {
+    setState(() {
+      _isCountingIn = true;
+      _currentCount = _countInBeats;
+      _isBending = false;
+      _startTime = null;
+      _userPath = [];
+      _smoothedCents = 0.0;
+    });
+
+    _playClick();
+
+    _countInTimer?.cancel();
+    _countInTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _currentCount--;
+      });
+
+      if (_currentCount > 0) {
+        _playClick();
+      } else {
+        timer.cancel();
+        _startSessionRecording();
+      }
+    });
+  }
+
+  void _playClick() {
+    if (_isMetronomeEnabled) {
+      _audioPlayer.play(AssetSource('audio/click.wav'));
+    }
+  }
+
+  void _startSessionRecording() {
+    setState(() {
+      _isCountingIn = false;
+      _isBending = true;
+      _startTime = DateTime.now();
+      _userPath = [];
+      _smoothedCents = 0.0;
+    });
+    widget.controller.startBendsPractice(_selectedReferenceNote.frequency);
   }
 
   void _resetSession() {
-    _isBending = false;
-    _startTime = null;
-    _referenceFrequency = null;
-    _userPath = [];
-    _smoothedCents = 0;
-    _stableFrames = 0;
-    _currentMaxCents = _calculateMinMaxCents();
+    _countInTimer?.cancel();
+    setState(() {
+      _isCountingIn = false;
+      _currentCount = 0;
+      _isBending = false;
+      _startTime = null;
+      _referenceFrequency = null;
+      _userPath = [];
+      _smoothedCents = 0;
+      _stableFrames = 0;
+      _currentMaxCents = _calculateMinMaxCents();
+    });
+    widget.controller.stopBendsPractice();
   }
 
   Widget _buildReferenceNoteSelector() {
@@ -222,77 +263,152 @@ class _BendsPracticeTabState extends State<BendsPracticeTab> {
     return Column(
       children: [
         _buildReferenceNoteSelector(),
+        _buildCountInSelector(),
+        _buildDurationSelector(),
         _buildBendTypeSelector(),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: _buildGraph(),
+            child: Stack(
+              children: [
+                _buildGraph(),
+                if (_isCountingIn)
+                  Center(
+                    child: Text(
+                      _currentCount.toString(),
+                      style: const TextStyle(
+                        fontSize: 120,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(color: Colors.black54, blurRadius: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
         _buildCurveShapeSelector(),
         const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.only(bottom: 24.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  RecordButton(
-                    isRecording: widget.controller.isRecording,
-                    onPressed: () {
-                      if (widget.controller.isRecording) {
-                        widget.controller.stopCapture();
-                        _resetSession();
-                      } else {
-                        widget.controller.startCapture();
-                      }
-                    },
-                    size: 56,
+          child: GestureDetector(
+            onTap: _isBending ? _resetSession : _startBending,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+              decoration: BoxDecoration(
+                color: _isBending ? AppColors.errorAccent : AppColors.primaryAccent,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: (_isBending ? AppColors.errorAccent : AppColors.primaryAccent).withValues(alpha: 0.4),
+                    blurRadius: 16,
+                    spreadRadius: 2,
                   ),
-                  const SizedBox(height: 4),
-                  const Text("MIC", style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
                 ],
               ),
-              const SizedBox(width: 32),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildManualTriggerButton(),
-                  const SizedBox(height: 4),
-                  const Text("RESET", style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
-                ],
+              child: Text(
+                _isBending ? "STOP" : "START BEND",
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
               ),
-            ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildManualTriggerButton() {
-    return GestureDetector(
-      onTap: _resetSession,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.warningAccent,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.warningAccent.withValues(alpha: 0.4),
-              blurRadius: 16,
-              spreadRadius: 4,
+
+
+  Widget _buildDurationSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
+      child: Row(
+        children: [
+          const Text("Duration:", style: TextStyle(color: Colors.white70)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [1, 2, 3, 4].map((sec) {
+                  final isSelected = _durationSeconds == sec;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ChoiceChip(
+                      label: Text("${sec}s"),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        if (selected && !_isBending && !_isCountingIn) {
+                          setState(() => _durationSeconds = sec);
+                        }
+                      },
+                      selectedColor: AppColors.primaryAccent,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.black : Colors.white,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
-          ],
-        ),
-        child: const Icon(
-          Icons.refresh,
-          size: 32,
-          color: Colors.black,
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCountInSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        children: [
+          const Text("Count-In:", style: TextStyle(color: Colors.white70)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [0, 1, 2, 3, 4].map((beats) {
+                  final isSelected = _countInBeats == beats;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ChoiceChip(
+                      label: Text(beats == 0 ? "Off" : "$beats"),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _countInBeats = beats);
+                      },
+                      selectedColor: AppColors.primaryAccent,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.black : Colors.white,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              _isMetronomeEnabled ? Icons.volume_up : Icons.volume_off,
+              color: _isMetronomeEnabled ? AppColors.primaryAccent : Colors.white38,
+            ),
+            onPressed: () {
+              setState(() {
+                _isMetronomeEnabled = !_isMetronomeEnabled;
+              });
+            },
+            tooltip: "Toggle Metronome Click",
+          ),
+        ],
       ),
     );
   }
@@ -447,10 +563,8 @@ class BendGraphPainter extends CustomPainter {
     // Draw User Path
     _drawUserPath(canvas, size, centsToY, timeToX);
 
-    // Current position and dot logic
-    final double t = isBending && userPath.isNotEmpty 
-        ? userPath.last.dx 
-        : 0;
+    // Current position and playhead logic
+    final double t = isBending ? currentTime : 0.0;
     
     final double cents = isBending && userPath.isNotEmpty 
         ? userPath.last.dy 
@@ -458,7 +572,14 @@ class BendGraphPainter extends CustomPainter {
         
     final double x = timeToX(t);
     final double y = centsToY(cents);
+
+    // Draw Vertical Sweeping Playhead
+    final playheadPaint = Paint()
+      ..color = AppColors.errorAccent
+      ..strokeWidth = 2.0;
+    canvas.drawLine(Offset(x, 0), Offset(x, size.height), playheadPaint);
     
+    // Draw Dot exactly on the playhead
     final dotPaint = Paint()
       ..color = AppColors.primaryAccent
       ..style = PaintingStyle.fill;
