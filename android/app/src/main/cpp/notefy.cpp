@@ -765,4 +765,77 @@ extern "C"
         g_noiseThreshold = NOISE_GATE_CHROMATIC;
         g_yinThreshold = 0.15f;
     }
+
+    // ========================================================================
+    // NEW: Fast, constrained Pitch Tracking specifically for Bends Practice
+    // ========================================================================
+    __attribute__((visibility("default"))) __attribute__((used)) float detect_pitch_bend(float *audioData, int length, int sampleRate, float expectedFreq)
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        if (audioData == nullptr || length < 128 || expectedFreq <= 0.0f)
+        {
+            return -1.0f;
+        }
+
+        // Fast bounds calculation: search from ~4 semitones down to ~7 semitones up
+        float minFreq = expectedFreq * 0.75f;
+        float maxFreq = expectedFreq * 1.50f;
+
+        int minTau = (int)(sampleRate / maxFreq);
+        int maxTau = (int)(sampleRate / minFreq);
+
+        int halfLen = length / 2;
+        if (minTau < 2) minTau = 2;
+        if (maxTau >= halfLen) maxTau = halfLen - 1;
+        if (minTau >= maxTau) return -1.0f;
+
+        // Practice bends needs a very low threshold to track decaying strings
+        float rms = calculate_rms(audioData, length);
+        if (rms < 0.002f) {
+            return -1.0f; 
+        }
+
+        if (!ensure_yin_buffer(halfLen)) {
+            return -1.0f;
+        }
+
+        // Use robust YIN difference and CMND steps to eliminate harmonic confusion
+        yin_difference(audioData, g_yinBuffer, length);
+        yin_cumulative_mean_normalized_difference(g_yinBuffer, length);
+
+        int bestTau = -1;
+        float bestValue = 0.2f; // YIN absolute threshold
+
+        for (int tau = minTau; tau < maxTau; tau++) {
+            if (g_yinBuffer[tau] < 0.2f) {
+                // Found a dip below threshold, now find local minimum
+                while (tau + 1 < maxTau && g_yinBuffer[tau + 1] < g_yinBuffer[tau]) {
+                    tau++;
+                }
+                bestValue = g_yinBuffer[tau];
+                bestTau = tau;
+                break;
+            }
+        }
+
+        // Fallback if no dip below threshold found: pick the absolute minimum in our tightly bounded range
+        if (bestTau == -1) {
+            float min_val = 1.0f;
+            for (int tau = minTau; tau < maxTau; tau++) {
+                if (g_yinBuffer[tau] < min_val) {
+                    min_val = g_yinBuffer[tau];
+                    bestTau = tau;
+                }
+            }
+            // If the best minimum is still garbage, we don't have a solid pitch
+            if (min_val > 0.4f) {
+                return -1.0f; 
+            }
+        }
+
+        // Sub-sample interpolation
+        float betterTau = yin_parabolic_interpolation(g_yinBuffer, bestTau, length);
+        
+        return (float)sampleRate / betterTau;
+    }
 }

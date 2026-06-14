@@ -3,6 +3,7 @@ import '../../tuner/presentation/tuner_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import 'tabs/bends_practice_tab.dart';
 import 'tabs/placeholder_tab.dart';
+import 'tabs/fretboard_practice_tab.dart';
 
 class PracticeView extends StatefulWidget {
   final TunerController controller;
@@ -40,7 +41,7 @@ class _PracticeViewState extends State<PracticeView> with SingleTickerProviderSt
           tabs: const [
             Tab(text: "Bends"),
             Tab(text: "Chords"),
-            Tab(text: "Tremolo"),
+            Tab(text: "Fretboard"),
           ],
         ),
         Expanded(
@@ -53,11 +54,7 @@ class _PracticeViewState extends State<PracticeView> with SingleTickerProviderSt
                 message: "To be implemented",
                 icon: Icons.grid_on,
               ),
-              const PlaceholderTab(
-                title: "Tremolo Practice",
-                message: "To be implemented",
-                icon: Icons.waves,
-              ),
+              FretboardPracticeTab(controller: widget.controller),
             ],
           ),
         ),

@@ -43,6 +43,11 @@ class TunerController extends ChangeNotifier {
   double _lastDetectedB = -1.0;
   final Map<int, double> _calibrationMeasurements = {};
 
+  // Bends Practice state
+  bool _isBendsPracticeActive = false;
+  double? _bendExpectedFreq;
+  double _currentBendPitch = -1.0;
+
   // Standby state
   bool _isInStandby = false;
   Timer? _standbyTimer;
@@ -59,9 +64,11 @@ class TunerController extends ChangeNotifier {
   // Getters
   TunerState get state => _state;
   TuningMode get tuningMode => _tuningMode;
-  List<double> get trailPositions => _trailPositions;
   double get displayedCents => _displayedCents;
+  double get targetCents => _targetCents;
+  List<double> get trailPositions => _trailPositions;
   double get scrollOffset => _scrollOffset;
+  double get currentBendPitch => _currentBendPitch;
   bool get isInStandby => _isInStandby;
   double get standbyProgress => _standbyProgress;
 
@@ -151,7 +158,7 @@ class TunerController extends ChangeNotifier {
       onPitchDetected: _onPitchDetected,
       onNoPitch: _onNoPitchDetected,
       onError: _onError,
-      onRawData: _isCalibrating ? _onRawAudioData : null,
+      onRawData: (_isCalibrating || _isBendsPracticeActive) ? _onRawAudioData : null,
     );
 
     if (success) {
@@ -178,6 +185,14 @@ class TunerController extends ChangeNotifier {
       final b = _audioService.detectInharmonicity(data, expectedF1);
       if (b > 0) {
         _lastDetectedB = b;
+        notifyListeners();
+      }
+    }
+
+    if (_isBendsPracticeActive && _bendExpectedFreq != null) {
+      double pitch = _audioService.trackBendPitch(data, _bendExpectedFreq!);
+      if (pitch > 0) {
+        _currentBendPitch = pitch;
         notifyListeners();
       }
     }
@@ -482,8 +497,35 @@ class TunerController extends ChangeNotifier {
     if (_currentPreset.id == preset.id) {
       _currentPreset = TuningPreset.standard6String();
     }
-    _saveState();
+    _targetString = null;
     notifyListeners();
+  }
+
+  // --- Bends Practice Methods ---
+  void startBendsPractice(double expectedFreq) {
+    _isBendsPracticeActive = true;
+    _bendExpectedFreq = expectedFreq;
+    _currentBendPitch = -1.0;
+    
+    // Restart capture to bind onRawData if it was running without it
+    // Or start it if it wasn't running
+    if (isRecording) {
+      stopCapture().then((_) => startCapture());
+    } else {
+      startCapture();
+    }
+  }
+
+  void stopBendsPractice() {
+    _isBendsPracticeActive = false;
+    _bendExpectedFreq = null;
+    _currentBendPitch = -1.0;
+    
+    // If it was recording just for the bend session, we might want to stop it
+    // Or just restart it to unbind the heavy onRawData listener
+    if (isRecording) {
+      stopCapture().then((_) => startCapture());
+    }
   }
 
   @override
