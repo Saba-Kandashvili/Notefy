@@ -14,6 +14,7 @@ import '../data/audio_service.dart';
 import '../data/tuner_repository.dart';
 import '../domain/tuner_state.dart';
 import '../domain/tuning_mode.dart';
+import 'package:record/record.dart';
 
 /// Controller that manages tuner state and business logic
 class TunerController extends ChangeNotifier {
@@ -57,6 +58,10 @@ class TunerController extends ChangeNotifier {
   bool _wasInTune = false;
   static const double _inTuneThreshold = 5.0; // cents
 
+  // Microphone selection
+  List<InputDevice> _availableMicrophones = [];
+  InputDevice? _selectedMicrophone;
+
   // Animation controllers (will be set by view)
   AnimationController? _standbyAnimationController;
   AnimationController? _scrollAnimationController;
@@ -71,6 +76,9 @@ class TunerController extends ChangeNotifier {
   double get currentBendPitch => _currentBendPitch;
   bool get isInStandby => _isInStandby;
   double get standbyProgress => _standbyProgress;
+
+  List<InputDevice> get availableMicrophones => _availableMicrophones;
+  InputDevice? get selectedMicrophone => _selectedMicrophone;
 
   TuningPreset get currentPreset => _currentPreset;
   InstrumentString? get targetString => _targetString;
@@ -91,6 +99,9 @@ class TunerController extends ChangeNotifier {
       isInitialized: success,
       status: success ? "Tap to Start" : "Microphone permission denied",
     );
+    if (success) {
+      _availableMicrophones = await _audioService.getAvailableMicrophones();
+    }
     await _loadSavedState();
     notifyListeners();
   }
@@ -323,6 +334,13 @@ class TunerController extends ChangeNotifier {
 
   /// Set tuning mode
   Future<void> setTuningMode(TuningMode mode) async {
+    if (_tuningMode == mode) return;
+
+    final wasRecording = isRecording;
+    if (wasRecording) {
+      stopCapture();
+    }
+
     _tuningMode = mode;
     _selectDefaultTargetForMode();
     _selectedPianoKey = null;
@@ -347,8 +365,30 @@ class TunerController extends ChangeNotifier {
         break;
     }
 
-    await _saveState();
+    // Apply special settings based on mode
+    if (mode == TuningMode.generator) {
+      // Generator handles its own audio
+    }
+
+    if (wasRecording && mode != TuningMode.generator) {
+      // Give a tiny delay before restarting audio to ensure native engine state is reset
+      await Future.delayed(const Duration(milliseconds: 100));
+      startCapture();
+    }
+    
     notifyListeners();
+  }
+
+  /// Change the selected microphone
+  Future<void> setMicrophone(InputDevice? device) async {
+    _selectedMicrophone = device;
+    notifyListeners();
+
+    // If we're already recording, seamlessly restart the capture with the new device
+    if (isRecording) {
+      await _audioService.stopCapture();
+      startCapture();
+    }
   }
 
   /// Select a guitar string to tune

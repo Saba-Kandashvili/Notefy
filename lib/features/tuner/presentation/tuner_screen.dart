@@ -298,6 +298,11 @@ class _TunerScreenState extends State<TunerScreen>
         currentMode: _controller.tuningMode,
         onModeSelected: _handleModeChange,
         onReportBug: _showBugReportDialog,
+        availableMicrophones: _controller.availableMicrophones,
+        selectedMicrophone: _controller.selectedMicrophone,
+        onMicrophoneSelected: (device) {
+          _controller.setMicrophone(device);
+        },
       ),
       body: SafeArea(child: _buildBody()),
     );

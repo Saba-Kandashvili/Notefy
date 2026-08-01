@@ -1,5 +1,6 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_audio_capture/flutter_audio_capture.dart';
+import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -14,8 +15,9 @@ typedef ErrorCallback = void Function(Object error);
 
 /// Service responsible for audio capture and pitch detection
 class AudioService {
-  final FlutterAudioCapture _audioRecorder = FlutterAudioCapture();
+  final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioEngine _engine = AudioEngine();
+  StreamSubscription<Uint8List>? _audioStreamSubscription;
 
   bool _isInitialized = false;
   bool _isRecording = false;
@@ -31,7 +33,9 @@ class AudioService {
     }
 
     try {
-      await _audioRecorder.init();
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (!hasPermission) return false;
+
       _isInitialized = true;
       return true;
     } catch (e) {
@@ -40,37 +44,96 @@ class AudioService {
     }
   }
 
+  /// Get a list of available input devices (microphones)
+  Future<List<InputDevice>> getAvailableMicrophones() async {
+    if (!_isInitialized) return [];
+    return await _audioRecorder.listInputDevices();
+  }
+
+  /// Helper to safely convert 16-bit PCM (Uint8List) to Float32List
+  Float32List _convertToFloat32List(Uint8List pcm16Data) {
+    final byteData = ByteData.view(pcm16Data.buffer, pcm16Data.offsetInBytes, pcm16Data.lengthInBytes);
+    final floatList = Float32List(pcm16Data.lengthInBytes ~/ 2);
+    // Use Endian.host because the record package outputs native PCM bytes
+    for (int i = 0; i < floatList.length; i++) {
+      floatList[i] = byteData.getInt16(i * 2, Endian.host) / 32768.0;
+    }
+    return floatList;
+  }
+
   /// Start capturing audio and detecting pitch
   Future<bool> startCapture({
     required PitchCallback onPitchDetected,
     required VoidCallback onNoPitch,
     required ErrorCallback onError,
     void Function(Float32List data)? onRawData,
+    InputDevice? selectedDevice,
   }) async {
     if (!_isInitialized) return false;
+    
+    // Stop any existing stream
+    if (_isRecording) {
+      await stopCapture();
+    }
 
     try {
-      await _audioRecorder.start(
-        (Float32List data) {
-          try {
-            if (onRawData != null) onRawData(data);
+      final stream = await _audioRecorder.startStream(RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: AppConstants.sampleRate,
+        numChannels: 1,
+        device: selectedDevice,
+        autoGain: true,        // Restored: boosts the decaying tail of a note for longer sustain
+        echoCancel: false, 
+        noiseSuppress: true,   // Restored: cuts background hiss that can confuse YIN
+      ));
 
-            final result = _engine.processAudioFloat32WithConfidence(data);
-            if (result.hasPitch &&
-                result.frequency > AppConstants.minDetectableFrequency &&
-                result.frequency < AppConstants.maxDetectableFrequency) {
-              onPitchDetected(result);
-            } else {
-              onNoPitch();
+      Float32List floatBuffer = Float32List(AppConstants.bufferSize);
+      int floatBufferIndex = 0;
+      final int hopSize = AppConstants.bufferSize ~/ 2;
+
+      _audioStreamSubscription = stream.listen(
+        (Uint8List data) {
+          try {
+            final floatData = _convertToFloat32List(data);
+            
+            int offset = 0;
+            while (offset < floatData.length) {
+              final int remainingSpace = AppConstants.bufferSize - floatBufferIndex;
+              int copyLength = floatData.length - offset;
+              if (copyLength > remainingSpace) copyLength = remainingSpace;
+              
+              floatBuffer.setRange(floatBufferIndex, floatBufferIndex + copyLength, floatData, offset);
+              floatBufferIndex += copyLength;
+              offset += copyLength;
+              
+              if (floatBufferIndex >= AppConstants.bufferSize) {
+                if (onRawData != null) {
+                  onRawData(Float32List.fromList(floatBuffer));
+                }
+
+                final result = _engine.processAudioFloat32WithConfidence(floatBuffer);
+                if (result.hasPitch &&
+                    result.frequency > AppConstants.minDetectableFrequency &&
+                    result.frequency < AppConstants.maxDetectableFrequency) {
+                  onPitchDetected(result);
+                } else {
+                  onNoPitch();
+                }
+                
+                // Reset index to 0. 
+                // We previously used a 50% overlap, but this caused the UI's 
+                // exponential moving average filter to converge twice as fast,
+                // making the needle appear jittery. 0 overlap restores the old feel.
+                floatBufferIndex = 0;
+              }
             }
           } catch (e) {
             debugPrint('Audio processing error: $e');
             onNoPitch();
           }
         },
-        (Object e) => onError(e),
-        sampleRate: AppConstants.sampleRate,
-        bufferSize: AppConstants.bufferSize,
+        onError: (e) => onError(e),
+        cancelOnError: false,
       );
 
       WakelockPlus.enable();
@@ -85,6 +148,8 @@ class AudioService {
   /// Stop capturing audio
   Future<void> stopCapture() async {
     try {
+      await _audioStreamSubscription?.cancel();
+      _audioStreamSubscription = null;
       await _audioRecorder.stop();
     } catch (e) {
       // Ignore stop errors
@@ -123,6 +188,7 @@ class AudioService {
     if (_isRecording) {
       stopCapture();
     }
+    _audioRecorder.dispose();
     _engine.dispose();
   }
 }
