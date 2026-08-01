@@ -20,6 +20,11 @@
 #define M_PI 3.14159265358979323846f
 #endif
 
+#include "synth_engine.h"
+
+// Global SynthEngine instance
+static SynthEngine* g_synthEngine = nullptr;
+
 // ============================================================================
 // YIN Algorithm Configuration
 // ============================================================================
@@ -837,5 +842,64 @@ extern "C"
         float betterTau = yin_parabolic_interpolation(g_yinBuffer, bestTau, length);
         
         return (float)sampleRate / betterTau;
+    }
+
+    // ========================================================================
+    // Generator (Synth) Bindings
+    // ========================================================================
+    __attribute__((visibility("default"))) __attribute__((used)) bool synth_start(int waveform, float frequency) {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        if (g_synthEngine == nullptr) {
+            g_synthEngine = new SynthEngine();
+        }
+        g_synthEngine->setWaveform(waveform);
+        g_synthEngine->setFrequency(frequency);
+        return g_synthEngine->start();
+    }
+
+    __attribute__((visibility("default"))) __attribute__((used)) void synth_stop() {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        if (g_synthEngine != nullptr) {
+            g_synthEngine->stop();
+            delete g_synthEngine;
+            g_synthEngine = nullptr;
+        }
+    }
+
+    __attribute__((visibility("default"))) __attribute__((used)) void synth_set_frequency(float frequency) {
+        if (g_synthEngine != nullptr) {
+            g_synthEngine->setFrequency(frequency);
+        }
+    }
+
+    __attribute__((visibility("default"))) __attribute__((used)) void synth_set_waveform(int waveform) {
+        if (g_synthEngine != nullptr) {
+            g_synthEngine->setWaveform(waveform);
+        }
+    }
+
+    __attribute__((visibility("default"))) __attribute__((used)) void synth_sweep(float endFreq, float durationSec, bool loop) {
+        if (g_synthEngine != nullptr) {
+            g_synthEngine->startSweep(endFreq, durationSec, loop);
+        }
+    }
+
+    __attribute__((visibility("default"))) __attribute__((used)) void synth_stop_sweep() {
+        if (g_synthEngine != nullptr) {
+            g_synthEngine->stopSweep();
+        }
+    }
+
+    __attribute__((visibility("default"))) __attribute__((used)) float synth_get_frequency() {
+        if (g_synthEngine != nullptr) {
+            return g_synthEngine->getFrequency();
+        }
+        return -1.0f;
+    }
+
+    __attribute__((visibility("default"))) __attribute__((used)) void synth_set_loop(bool loop) {
+        if (g_synthEngine != nullptr) {
+            g_synthEngine->setLoopSweep(loop);
+        }
     }
 }

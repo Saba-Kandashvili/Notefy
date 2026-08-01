@@ -40,6 +40,11 @@ class AppDrawer extends StatelessWidget {
             icon: Icons.fitness_center,
             mode: TuningMode.practice,
           ),
+          _buildModeItem(
+            context,
+            icon: Icons.waves,
+            mode: TuningMode.generator,
+          ),
           const Divider(color: Colors.white24),
           ListTile(
             leading: const Icon(

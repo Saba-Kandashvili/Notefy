@@ -342,6 +342,9 @@ class TunerController extends ChangeNotifier {
       case TuningMode.practice:
         _audioService.setTuningMode(TuningModeNative.practice);
         break;
+      case TuningMode.generator:
+        // Generator mode doesn't use pitch detection
+        break;
     }
 
     await _saveState();

@@ -25,6 +25,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        prefab = true
+    }
+
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
@@ -43,6 +47,8 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags += ""
+                arguments += "-DANDROID_STL=c++_shared"
+                arguments += "-DANDROID_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
             }
         }
     }
@@ -82,4 +88,8 @@ signingConfigs {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("com.google.oboe:oboe:1.8.1")
 }

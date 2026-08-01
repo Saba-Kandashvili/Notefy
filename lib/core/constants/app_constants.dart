@@ -25,6 +25,6 @@ class AppConstants {
 
   // App info
   static const String appName = 'Notefy';
-  static const String appVersion = 'v1.0.0 (Public Beta)';
+  static const String appVersion = 'v1.1.2 (Public Beta)';
   static const String supportEmail = 'sabakandashvili2004@gmail.com';
 }
