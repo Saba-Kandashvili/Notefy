@@ -130,7 +130,7 @@ class TunerController extends ChangeNotifier {
   }
 
   Future<void> _loadSavedState() async {
-    _tuningMode = await _repository.loadTuningMode();
+    _tuningMode = TuningMode.chromatic; // Always default to chromatic mode
     _currentPreset =
         await _repository.loadGuitarPreset() ?? TuningPreset.standard6String();
     _customPresets = await _repository.loadCustomPresets();
@@ -361,12 +361,13 @@ class TunerController extends ChangeNotifier {
         _audioService.setTuningMode(TuningModeNative.practice);
         break;
       case TuningMode.generator:
-        // Generator mode doesn't use pitch detection
+      case TuningMode.analyzer:
+        // Generator and analyzer don't use real-time pitch detection
         break;
     }
 
     // Apply special settings based on mode
-    if (mode == TuningMode.generator) {
+    if (mode == TuningMode.generator || mode == TuningMode.analyzer) {
       // Generator handles its own audio
     }
 

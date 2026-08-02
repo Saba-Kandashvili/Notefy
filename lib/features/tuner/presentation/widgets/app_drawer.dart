@@ -53,6 +53,11 @@ class AppDrawer extends StatelessWidget {
             icon: Icons.waves,
             mode: TuningMode.generator,
           ),
+          _buildModeItem(
+            context,
+            icon: Icons.analytics,
+            mode: TuningMode.analyzer,
+          ),
           const Divider(color: Colors.white24),
           ListTile(
             leading: const Icon(

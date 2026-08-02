@@ -8,6 +8,7 @@ import '../../guitar/presentation/guitar_tuner_view.dart';
 import '../../piano/presentation/piano_tuner_view.dart';
 import '../../practice/presentation/practice_view.dart';
 import '../../generator/presentation/generator_view.dart';
+import '../../analyzer/presentation/analyzer_view.dart';
 import '../domain/tuning_mode.dart';
 import 'tuner_controller.dart';
 import 'widgets/app_drawer.dart';
@@ -320,6 +321,8 @@ class _TunerScreenState extends State<TunerScreen>
         return PracticeView(controller: _controller);
       case TuningMode.generator:
         return const GeneratorView();
+      case TuningMode.analyzer:
+        return const AnalyzerView();
     }
   }
 }
