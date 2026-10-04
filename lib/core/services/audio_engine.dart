@@ -65,6 +65,34 @@ typedef DartDetectPitchBend =
     double Function(ffi.Pointer<ffi.Float>, int, int, double);
 
 // ============================================================================
+// FFI Type Definitions for Synth Generator
+// ============================================================================
+
+typedef NativeSynthStart = ffi.Bool Function(ffi.Int32, ffi.Float);
+typedef DartSynthStart = bool Function(int, double);
+
+typedef NativeSynthStop = ffi.Void Function();
+typedef DartSynthStop = void Function();
+
+typedef NativeSynthSetFrequency = ffi.Void Function(ffi.Float);
+typedef DartSynthSetFrequency = void Function(double);
+
+typedef NativeSynthSetWaveform = ffi.Void Function(ffi.Int32);
+typedef DartSynthSetWaveform = void Function(int);
+
+typedef NativeSynthSweep = ffi.Void Function(ffi.Float, ffi.Float, ffi.Bool);
+typedef DartSynthSweep = void Function(double, double, bool);
+
+typedef NativeSynthStopSweep = ffi.Void Function();
+typedef DartSynthStopSweep = void Function();
+
+typedef NativeSynthGetFrequency = ffi.Float Function();
+typedef DartSynthGetFrequency = double Function();
+
+typedef NativeSynthSetLoop = ffi.Void Function(ffi.Bool);
+typedef DartSynthSetLoop = void Function(bool);
+
+// ============================================================================
 // Tuning Mode Constants (must match C++ definitions)
 // ============================================================================
 
@@ -112,6 +140,16 @@ class AudioEngine {
   DartIsGateOpen? _isGateOpen;
   DartDetectInharmonicity? _detectInharmonicity;
   DartDetectPitchBend? _detectPitchBend;
+
+  // Synth functions
+  DartSynthStart? _synthStart;
+  DartSynthStop? _synthStop;
+  DartSynthSetFrequency? _synthSetFrequency;
+  DartSynthSetWaveform? _synthSetWaveform;
+  DartSynthSweep? _synthSweep;
+  DartSynthStopSweep? _synthStopSweep;
+  DartSynthGetFrequency? _synthGetFrequency;
+  DartSynthSetLoop? _synthSetLoop;
 
   // Reusable buffer for audio data (avoids allocation every frame)
   ffi.Pointer<ffi.Float>? _audioBuffer;
@@ -237,6 +275,36 @@ class AudioEngine {
           .asFunction();
     } catch (e) {
       _detectPitchBend = null;
+    }
+
+    // Load Synth functions
+    try {
+      _synthStart = _lib
+          .lookup<ffi.NativeFunction<NativeSynthStart>>('synth_start')
+          .asFunction();
+      _synthStop = _lib
+          .lookup<ffi.NativeFunction<NativeSynthStop>>('synth_stop')
+          .asFunction();
+      _synthSetFrequency = _lib
+          .lookup<ffi.NativeFunction<NativeSynthSetFrequency>>('synth_set_frequency')
+          .asFunction();
+      _synthSetWaveform = _lib
+          .lookup<ffi.NativeFunction<NativeSynthSetWaveform>>('synth_set_waveform')
+          .asFunction();
+      _synthSweep = _lib
+          .lookup<ffi.NativeFunction<NativeSynthSweep>>('synth_sweep')
+          .asFunction();
+      _synthStopSweep = _lib
+          .lookup<ffi.NativeFunction<NativeSynthStopSweep>>('synth_stop_sweep')
+          .asFunction();
+      _synthGetFrequency = _lib
+          .lookup<ffi.NativeFunction<NativeSynthGetFrequency>>('synth_get_frequency')
+          .asFunction();
+      _synthSetLoop = _lib
+          .lookup<ffi.NativeFunction<NativeSynthSetLoop>>('synth_set_loop')
+          .asFunction();
+    } catch (e) {
+      print("Failed to load synth functions: $e");
     }
 
     // Pre-allocate confidence pointer
@@ -373,6 +441,50 @@ class AudioEngine {
     _audioBuffer!.asTypedList(audioData.length).setAll(0, audioData);
 
     return _detectPitchBend!(_audioBuffer!, audioData.length, sampleRate, expectedFreq);
+  }
+
+  // ============================================================================
+  // Synth Generator Controls
+  // ============================================================================
+
+  /// Start the synthesizer. Waveform: 0=Sine, 1=Square, 2=Sawtooth, 3=Triangle
+  bool synthStart({required int waveform, required double frequency}) {
+    return _synthStart?.call(waveform, frequency) ?? false;
+  }
+
+  /// Stop the synthesizer
+  void synthStop() {
+    _synthStop?.call();
+  }
+
+  /// Update synthesizer frequency instantly
+  void synthSetFrequency(double frequency) {
+    _synthSetFrequency?.call(frequency);
+  }
+
+  /// Update synthesizer waveform
+  void synthSetWaveform(int waveform) {
+    _synthSetWaveform?.call(waveform);
+  }
+
+  /// Sweep synthesizer frequency over time
+  void synthSweep({required double endFreq, required double durationSec, bool loop = false}) {
+    _synthSweep?.call(endFreq, durationSec, loop);
+  }
+
+  /// Stop sweeping but keep synthesizer running at current frequency
+  void synthStopSweep() {
+    _synthStopSweep?.call();
+  }
+
+  /// Get the exact current frequency from the synthesizer engine
+  double synthGetFrequency() {
+    return _synthGetFrequency?.call() ?? -1.0;
+  }
+
+  /// Update loop toggle for active sweep
+  void synthSetLoop(bool loop) {
+    _synthSetLoop?.call(loop);
   }
 
   void _ensureBufferSize(int requiredSize) {
