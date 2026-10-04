@@ -27,9 +27,12 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
     return Drawer(
       child: ListView(
-        padding: EdgeInsets.zero,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(bottom: bottomInset + 32.0),
         children: [
           _buildHeader(),
           _buildModeItem(
@@ -334,67 +337,74 @@ class AppDrawer extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                ...availableMicrophones.map((device) {
-                  final isSelected = selectedMicrophone?.id == device.id;
-                  final name = device.label.isNotEmpty
-                      ? device.label
-                      : "Device ${device.id}";
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: availableMicrophones.map((device) {
+                        final isSelected = selectedMicrophone?.id == device.id;
+                        final name = device.label.isNotEmpty
+                            ? device.label
+                            : "Device ${device.id}";
 
-                  return Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        if (onMicrophoneSelected != null) {
-                          onMicrophoneSelected!(device);
-                        }
-                        Navigator.pop(context);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
-                        ),
-                        color: isSelected
-                            ? AppColors.primaryAccent.withValues(alpha: 0.1)
-                            : Colors.transparent,
-                        child: Row(
-                          children: [
-                            Icon(
-                              isSelected
-                                  ? Icons.mic_rounded
-                                  : Icons.mic_none_rounded,
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              if (onMicrophoneSelected != null) {
+                                onMicrophoneSelected!(device);
+                              }
+                              Navigator.pop(context);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 16,
+                              ),
                               color: isSelected
-                                  ? AppColors.primaryAccent
-                                  : AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Text(
-                                name,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? AppColors.primaryAccent
-                                      : AppColors.textPrimary,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                  fontSize: 16,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                  ? AppColors.primaryAccent.withValues(alpha: 0.1)
+                                  : Colors.transparent,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isSelected
+                                        ? Icons.mic_rounded
+                                        : Icons.mic_none_rounded,
+                                    color: isSelected
+                                        ? AppColors.primaryAccent
+                                        : AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(
+                                      name,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? AppColors.primaryAccent
+                                            : AppColors.textPrimary,
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                        fontSize: 16,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: AppColors.primaryAccent,
+                                    ),
+                                ],
                               ),
                             ),
-                            if (isSelected)
-                              const Icon(
-                                Icons.check_circle_rounded,
-                                color: AppColors.primaryAccent,
-                              ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                      }).toList(),
                     ),
-                  );
-                }),
+                  ),
+                ),
               ],
             ),
           ),
