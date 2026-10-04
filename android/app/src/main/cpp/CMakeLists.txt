@@ -26,3 +26,6 @@ target_link_libraries(native_tuner
     log
     oboe::oboe
 )
+
+target_link_options(native_tuner PRIVATE "-Wl,-z,max-page-size=16384")
+
